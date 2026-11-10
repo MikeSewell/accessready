@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hover menus</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main, header { padding: 24px; }
+  a { color: #0b4a8f; }
+  button, input { font: inherit; padding: 8px 12px; }
+  .bar { list-style: none; margin: 0; padding: 0; display: flex; gap: 32px; }
+  .bar > li { position: relative; padding: 8px 0; }
+  .sub { display: none; position: absolute; top: 100%; left: 0; margin: 0; padding: 8px 16px; list-style: none; background: #fff; border: 1px solid #555; white-space: nowrap; }
+  .bar > li:hover > .sub, .opens-on-focus:focus-within > .sub, .sub.open { display: block; }
+  .sub a { display: block; padding: 4px 0; }
+</style>
+</head>
+<body>
+<header>
+  <nav aria-label="Main">
+    <ul class="bar">
+      <li id="hover-only"><a href="clean.html">Programs</a>
+        <ul class="sub"><li><a href="clean.html">Youth</a></li><li><a href="clean.html">Seniors</a></li></ul></li>
+      <li id="focus-too" class="opens-on-focus"><a href="clean.html">About</a>
+        <ul class="sub"><li><a href="clean.html">Our team</a></li><li><a href="clean.html">Our board</a></li></ul></li>
+      <li id="button-menu"><button id="menu-button" type="button" aria-expanded="false" aria-controls="more-list">More</button>
+        <ul class="sub" id="more-list"><li><a href="clean.html">News</a></li><li><a href="clean.html">Events</a></li></ul></li>
+    </ul>
+  </nav>
+</header>
+<main>
+  <h1>Hover menus</h1>
+  <p>Three menus. Only the first cannot be opened from the keyboard.</p>
+</main>
+<script>const button = document.getElementById('menu-button'), list = document.getElementById('more-list');
+  const set = (open) => { list.classList.toggle('open', open); button.setAttribute('aria-expanded', String(open)); };
+  button.addEventListener('click', () => set(button.getAttribute('aria-expanded') !== 'true'));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') set(false); });</script>
+</body>
+</html>

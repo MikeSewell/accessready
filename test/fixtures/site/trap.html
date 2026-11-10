@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Keyboard trap</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main, header { padding: 24px; }
+  a { color: #0b4a8f; }
+  button, input { font: inherit; padding: 8px 12px; }
+  input { display: block; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Keyboard trap</h1>
+  <p><a id="before" href="clean.html">Link before the field</a></p>
+  <label for="when">A date field, which takes several Tab presses to cross</label>
+  <input id="when" type="date">
+  <label for="sticky">A field that swallows the Tab key</label>
+  <input id="sticky" type="text">
+  <p><a id="after" href="clean.html">Link nobody can reach</a></p>
+</main>
+<script>document.getElementById('sticky').addEventListener('keydown', (e) => { if (e.key === 'Tab') e.preventDefault(); });</script>
+</body>
+</html>

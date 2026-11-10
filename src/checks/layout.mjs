@@ -1,4 +1,4 @@
-// Two checks that need a real, rendered page rather than a rule engine.
+// Checks that need a real, rendered page rather than a rule engine.
 
 // 2.2.2 Pause, Stop, Hide: a video that starts by itself and loops, or runs longer than five
 // seconds, needs a way to pause it.
@@ -51,4 +51,62 @@ export async function checkReflow(page) {
       html: first ? first.outerHTML.replace(/\s+/g, ' ').slice(0, 160) : '',
     }];
   });
+}
+
+// Adds CSS through the CSSOM instead of a <style> tag, so a page whose Content Security
+// Policy forbids inline styles is measured the same way as any other. Returns a remover.
+export async function addStyles(page, css) {
+  await page.evaluate((text) => {
+    const sheet = new CSSStyleSheet();
+    sheet.replaceSync(text);
+    (window.__focuswalkSheets ||= []).push(sheet);
+    document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+  }, css);
+  return () => page.evaluate(() => {
+    const sheet = window.__focuswalkSheets.pop();
+    document.adoptedStyleSheets = document.adoptedStyleSheets.filter((s) => s !== sheet);
+  }).catch(() => {});
+}
+
+// 1.4.12 Text Spacing: people with dyslexia or low vision widen line, letter and word
+// spacing with their own styles. Nothing may be cut off when they do. This applies the
+// spacing WCAG names and reports text that is clipped afterwards and was not before.
+const SPACING = '* { line-height: 1.5 !important; letter-spacing: 0.12em !important; word-spacing: 0.16em !important; } p { margin-bottom: 2em !important; }';
+
+function clippedText(mark) {
+  const out = [];
+  for (const el of document.body.querySelectorAll('*')) {
+    const cs = getComputedStyle(el);
+    const hidesY = /hidden|clip/.test(cs.overflowY), hidesX = /hidden|clip/.test(cs.overflowX);
+    if (!hidesX && !hidesY) continue;
+    if (el.clientWidth <= 1 || el.clientHeight <= 1 || cs.visibility === 'hidden') continue; // screen-reader-only text
+    if (!(el.innerText || '').trim()) continue;
+    const cut = (hidesY && el.scrollHeight - el.clientHeight > 1) || (hidesX && el.scrollWidth - el.clientWidth > 1);
+    if (!cut) continue;
+    if (mark) { el.setAttribute('data-focuswalk-clipped', ''); continue; }
+    if (el.hasAttribute('data-focuswalk-clipped')) continue;
+    out.push({ el });
+  }
+  if (mark) return [];
+  // Report the innermost clipped box, not every ancestor that also clips.
+  const found = out.filter(({ el }) => !out.some((o) => o.el !== el && el.contains(o.el)));
+  const describe = (el) => el.id ? `#${CSS.escape(el.id)}` : el.tagName.toLowerCase() + (typeof el.className === 'string' && el.className.trim() ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.') : '');
+  return found.map(({ el }) => ({
+    id: 'text-spacing', source: 'focuswalk', kind: 'failure', wcag: ['1.4.12'], impact: 'serious',
+    title: 'Text is cut off when spacing is increased',
+    message: `"${(el.innerText || '').trim().replace(/\s+/g, ' ').slice(0, 40)}" is clipped once line, letter and word spacing are widened`,
+    selector: describe(el),
+    html: el.outerHTML.replace(/\s+/g, ' ').slice(0, 160),
+  }));
+}
+
+export async function checkTextSpacing(page) {
+  await page.evaluate(clippedText, true);
+  const remove = await addStyles(page, SPACING);
+  await page.waitForTimeout(150);
+  const issues = await page.evaluate(clippedText, false);
+  await remove();
+  await page.evaluate(() => document.querySelectorAll('[data-focuswalk-clipped]').forEach((el) => el.removeAttribute('data-focuswalk-clipped')));
+  await page.waitForTimeout(100);
+  return issues;
 }

@@ -10,7 +10,7 @@ const reports = {};
 
 before(async () => {
   site = await startSite({ '/report-failing': () => reports.failing, '/report-clean': () => reports.clean });
-  failing = await audit(site.origin, { paths: ['/focus.html', '/rules.html', '/headings.html', '/obscured.html', '/nope.html'] });
+  failing = await audit(site.origin, { paths: ['/focus.html', '/rules.html', '/headings.html', '/obscured.html', '/inventory.html', '/overimage.html', '/video.html', '/nav-a.html', '/nav-c.html', '/nope.html'] });
   clean = await audit(`${site.origin}/clean.html`);
   reports.failing = renderHtml(failing);
   reports.clean = renderHtml(clean);
@@ -46,4 +46,18 @@ test('console output lists every page and a failures-by-rule table', () => {
   assert.match(out, /^Failures by rule$/m);
   assert.match(out, /1 page could not be audited/);
   assert.doesNotMatch(out, /\x1b\[/, 'no color codes unless asked for');
+});
+
+test('the report lists what a person has to check, item by item', () => {
+  const r = reports.failing;
+  assert.match(r, /<h2>Check these by hand<\/h2>/);
+  assert.match(r, /&ldquo;Volunteers sorting food donations&rdquo;/);
+  assert.match(r, /<strong>Marked decorative<\/strong>/);
+  assert.match(r, /&ldquo;Click here&rdquo; goes to/);
+  assert.match(r, /&ldquo;Newsletter sign-up&rdquo; <span class="meta">· 2 fields, 1 required/);
+  assert.match(r, /between 2\.82:1 and 7\.46:1, needs 4\.5:1/);
+  assert.match(r, /<span class="meta">h2<\/span> Our work/);
+  assert.match(r, /automated checks for \d+ and lists what to review for \d+ more/);
+  // Background video is decoration and is not listed as needing captions.
+  assert.doesNotMatch(r, /<h3>Video and audio<\/h3>/);
 });

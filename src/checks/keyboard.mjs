@@ -11,6 +11,7 @@ import { PNG } from 'pngjs';
 const RING_MARGIN = 8; // px around the element where a focus ring may be drawn
 const MIN_CHANGED_PIXELS = 8;
 const CHANNEL_TOLERANCE = 12; // ignore anti-aliasing noise
+const INNER_STOPS = 8; // Tab presses one element may absorb (a date field has up to six parts)
 const MAX_FRAME_STOPS = 60; // consecutive Tab presses spent inside one iframe before giving up
 
 // Runs in the page. Describes the focused element and assigns it a stable number so the
@@ -63,12 +64,14 @@ function describeFocus() {
     if (top && (composedContains(box, top) || composedContains(top, box))) visible++;
     else if (top && !cover) cover = top;
   }
-  let coveredBy = '';
+  let coveredBy = '', coveredByModal = false;
   if (cover) {
     // Name the positioned ancestor doing the covering, which is the thing a developer has to fix.
     let c = cover;
     for (let n = cover; n && n !== document.body; n = parentOf(n)) { const p = getComputedStyle(n).position; if (p === 'fixed' || p === 'sticky') { c = n; break; } }
     coveredBy = `${selector(c)} (position: ${getComputedStyle(c).position})`;
+    const MODAL = 'dialog[open], [role=dialog], [role=alertdialog], [aria-modal=true]';
+    coveredByModal = !!(cover.closest(MODAL) || c.matches(MODAL) || c.querySelector(MODAL));
   }
 
   const textEntry = el.isContentEditable || el.tagName === 'TEXTAREA' ||
@@ -83,7 +86,9 @@ function describeFocus() {
     html: el.outerHTML.replace(/\s+/g, ' ').slice(0, 160),
     rect: { x: r.left, y: r.top, width: r.width, height: r.height },
     viewport: { width: innerWidth, height: innerHeight },
-    onScreen, visible, coveredBy, textEntry,
+    onScreen, visible, coveredBy, coveredByModal, textEntry,
+    inModal: !!el.closest('dialog[open], [aria-modal=true]'),
+    invisible: (() => { let o = 1; for (let n = box; n && n.nodeType === 1; n = parentOf(n)) o *= +getComputedStyle(n).opacity; return o < 0.05; })(),
   };
 }
 
@@ -141,6 +146,7 @@ function clipFor({ rect, viewport }) {
 export async function walkKeyboard(page, { maxStops = 150 } = {}) {
   const issues = [];
   const seen = new Set();
+  let lastId = null, sameStops = 0;
   let stops = 0, emptyStops = 0, frameStops = 0, framesSkipped = 0, capped = false;
 
   await page.evaluate(() => { document.activeElement?.blur?.(); window.scrollTo(0, 0); });
@@ -161,12 +167,43 @@ export async function walkKeyboard(page, { maxStops = 150 } = {}) {
     await page.evaluate(() => window.__focuswalk.current.focus({ preventScroll: true }));
     return { f, changed: changedPixels(focused, blurred) };
   };
+  // 2.1.2 No Keyboard Trap, the other direction.
+  const stuckBackwards = async (id) => {
+    for (let i = 0; i < INNER_STOPS; i++) {
+      await page.keyboard.press('Shift+Tab');
+      await page.waitForTimeout(60);
+      const now = await page.evaluate(describeFocus);
+      if (now.kind !== 'element' || now.id !== id) return false;
+    }
+    return true;
+  };
   const failing = ({ f, changed }) => f.kind === 'element' && (f.visible === 0 || (changed !== null && changed < MIN_CHANGED_PIXELS));
 
   for (;;) {
     if (stops >= maxStops) { capped = true; break; }
     await page.keyboard.press('Tab');
     await page.waitForTimeout(60);
+
+    // Still on the same element? Then do not blur and refocus it to take pictures: that
+    // would send a date field back to its first part and the walk would never get out.
+    const quick = await page.evaluate(describeFocus);
+    if (quick.kind === 'element' && quick.id === lastId) {
+      // Date and time fields have several parts inside one element, so keep pressing. Past
+      // that, and if Shift+Tab cannot leave either, focus is stuck. A modal dialog is
+      // allowed to hold focus.
+      if (++sameStops <= INNER_STOPS) continue;
+      if (!quick.inModal && await stuckBackwards(quick.id)) {
+        issues.push({
+          id: 'keyboard-trap', source: 'focuswalk', kind: 'failure', wcag: ['2.1.2'], impact: 'critical',
+          title: 'Keyboard focus gets stuck',
+          message: `${quick.tag}${quick.label ? ` "${quick.label}"` : ''} holds keyboard focus: neither Tab nor Shift+Tab moves off it, so everything after it is out of reach`,
+          selector: quick.selector, html: quick.html,
+        });
+      }
+      break;
+    }
+    sameStops = 0;
+
     let look = await inspect();
     if (failing(look)) {
       // Look twice before reporting. Late-loading styles or something still animating can
@@ -193,11 +230,19 @@ export async function walkKeyboard(page, { maxStops = 150 } = {}) {
     frameStops = 0;
     if (seen.has(f.id)) break; // back where we started
     seen.add(f.id);
+    lastId = f.id;
     stops++;
 
     const where = { selector: f.selector, html: f.html };
     const what = `${f.tag}${f.label ? ` "${f.label}"` : ''}`;
 
+    if (f.visible === 0 && f.coveredByModal) {
+      // A popup has opened over the page. Whether focus is behind it because the popup is
+      // broken or because this walk was mid-step when it opened cannot be told apart, so
+      // nothing is reported: the walk ends here and the caller notes the popup.
+      stops--;
+      break;
+    }
     if (f.visible === 0) {
       issues.push({
         id: 'focus-not-obscured', source: 'focuswalk', kind: 'failure', wcag: ['2.4.11'], impact: 'serious',
@@ -218,7 +263,9 @@ export async function walkKeyboard(page, { maxStops = 150 } = {}) {
       } : {
         id: 'focus-visible', source: 'focuswalk', kind: 'failure', wcag: ['2.4.7'], impact: 'serious',
         title: 'No visible focus indicator',
-        message: `${what} looks the same focused and unfocused, so a keyboard user cannot see where they are`,
+        message: f.invisible
+          ? `${what} takes keyboard focus while invisible (opacity 0), so the user cannot see where they are`
+          : `${what} looks the same focused and unfocused, so a keyboard user cannot see where they are`,
         ...where,
       });
     }

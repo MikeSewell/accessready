@@ -119,3 +119,12 @@ test('--version and --help exit 0', async () => {
   assert.equal(help.code, 0);
   assert.match(help.stdout, /Exit codes/);
 });
+
+test('findings from comparing pages are printed once, under "Across the site"', async () => {
+  const r = await run(site.origin, '/nav-a.html', '/nav-b.html', '/nav-c.html');
+  assert.equal(r.code, 1);
+  assert.match(r.stdout, /^\/nav-c\.html {2}no failures {2}4 tab stops$/m);
+  assert.match(r.stdout, /Across the site\n {2}note {2}\/nav-a\.html {2}Page title is shared with another page/);
+  assert.match(r.stdout, /FAIL {2}\/nav-c\.html {2}Navigation is in a different order on this page {2}3\.2\.3 Consistent Navigation/);
+  assert.match(r.stdout, /1 WCAG 2\.2 AA failure across 3 pages/);
+});

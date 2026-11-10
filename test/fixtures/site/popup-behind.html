@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Popup that leaves focus behind</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  #popup { position: fixed; inset: 0; background: #1c2733; color: #fff; padding: 24px; }
+  #popup[hidden] { display: none; }
+  button { font: inherit; padding: 8px 12px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Popup that leaves focus behind</h1>
+  <p><a id="first" href="clean.html">First link</a></p>
+  <p><a id="second" href="clean.html">Second link, which opens the popup</a></p>
+  <p><a id="third" href="clean.html">Third link, behind the popup</a></p>
+</main>
+<div id="popup" role="dialog" aria-modal="true" aria-labelledby="popup-title" hidden>
+  <h2 id="popup-title">Join our newsletter</h2>
+  <button id="popup-close" type="button">Close</button>
+</div>
+<script>
+  // A popup that opens over the page without taking focus, so Tab carries on underneath it.
+  const popup = document.getElementById('popup');
+  document.getElementById('second').addEventListener('focus', () => { popup.hidden = false; });
+</script>
+</body>
+</html>
