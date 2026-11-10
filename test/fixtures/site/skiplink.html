@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sliding skip link</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  .skip { position: absolute; left: 16px; top: -900px; background: #fff; padding: 8px 12px; transition: top 0.8s; }
+  .skip:focus { top: 0; }
+</style>
+</head>
+<body>
+<a class="skip" href="#content">Skip to main content</a>
+<main id="content">
+  <h1>Sliding skip link</h1>
+  <p>The skip link slides in over 800ms when it takes focus. <a href="clean.html">A link</a>.</p>
+</main>
+</body>
+</html>

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Focus indicators</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  .plain:focus { outline: none; }
+  .after { position: relative; }
+  .after:focus::after { content: ""; position: absolute; inset: -4px; border: 3px solid #0b4a8f; }
+  .wrap:focus-within { background: #ffe08a; }
+  input { font: inherit; padding: 8px 12px; display: block; border: 1px solid #555; }
+  #bare:focus { outline: none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Focus indicators</h1>
+  <p><a id="no-ring" class="plain" href="clean.html">Link with no focus indicator</a></p>
+  <p><a id="after-ring" class="plain after" href="clean.html">Link with a ring drawn by a pseudo-element</a></p>
+  <p class="wrap"><a id="wrapper-ring" class="plain" href="clean.html">Link whose wrapper shows focus</a></p>
+  <p><a id="default-ring" href="clean.html">Link with the browser default ring</a></p>
+  <label for="bare">Field with no outline</label>
+  <input id="bare" type="text">
+</main>
+</body>
+</html>
