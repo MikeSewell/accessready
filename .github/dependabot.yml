@@ -1,0 +1,13 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      audit-engine:
+        patterns: ["playwright", "@axe-core/playwright"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

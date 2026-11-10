@@ -1,0 +1,52 @@
+{
+  "name": "focuswalk",
+  "version": "0.1.0",
+  "description": "WCAG 2.2 AA audit for a whole site. Runs axe-core, then presses Tab through every page in real Chrome to catch what rule engines miss.",
+  "type": "module",
+  "bin": {
+    "focuswalk": "bin/focuswalk.mjs"
+  },
+  "exports": "./src/index.mjs",
+  "files": [
+    "bin/",
+    "src/",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test --test-concurrency=1 test/*.test.mjs"
+  },
+  "keywords": [
+    "accessibility",
+    "a11y",
+    "wcag",
+    "wcag22",
+    "ada",
+    "axe-core",
+    "playwright",
+    "keyboard",
+    "focus",
+    "audit",
+    "cli",
+    "ci"
+  ],
+  "author": "Mike Sewell (https://msewell.com)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MikeSewell/focuswalk.git"
+  },
+  "homepage": "https://github.com/MikeSewell/focuswalk#readme",
+  "bugs": {
+    "url": "https://github.com/MikeSewell/focuswalk/issues"
+  },
+  "dependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "playwright": "^1.65.0",
+    "pngjs": "^7.0.0"
+  }
+}

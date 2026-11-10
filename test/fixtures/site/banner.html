@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cookie banner</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  #cookie-banner { position: fixed; inset: 0; background: #1c2733; color: #fff; padding: 24px; }
+  button { font: inherit; padding: 8px 12px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Cookie banner</h1>
+  <p><a id="under-banner" href="clean.html">The only link on the page</a></p>
+</main>
+<aside id="cookie-banner" aria-label="Cookies"><p>We use cookies.</p>
+  <button type="button" onclick="this.parentElement.remove()">Reject all</button></aside>
+</body>
+</html>
