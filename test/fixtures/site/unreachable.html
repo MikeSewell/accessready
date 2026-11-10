@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mouse-only controls</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main, header { padding: 24px; }
+  a { color: #0b4a8f; }
+  button, input { font: inherit; padding: 8px 12px; }
+  .pointer { cursor: pointer; }
+  #agree { width: 24px; height: 24px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Mouse-only controls</h1>
+  <div id="fake-button" role="button">Save changes</div>
+  <p><span id="inline-handler" onclick="this.textContent = 'Clicked'">Show more</span></p>
+  <div id="pointer-only" class="pointer">Open details</div>
+  <p><button id="real-button" type="button">A real button</button></p>
+  <div class="pointer card"><a id="card-link" href="clean.html">A card whose link is reachable</a></div>
+  <p><label class="pointer" for="agree">I agree</label> <input id="agree" type="checkbox"></p>
+  <div role="toolbar" aria-label="Formatting"><button type="button">Bold</button><div id="roving" role="button" tabindex="-1">Italic</div></div>
+</main>
+
+</body>
+</html>

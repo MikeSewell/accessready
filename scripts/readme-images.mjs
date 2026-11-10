@@ -1,6 +1,6 @@
 // Rebuilds the images the README uses, from a real run against the demo pages:
 //   node scripts/readme-images.mjs
-// Writes docs/terminal.png, docs/report.png and docs/social-preview.png.
+// Writes docs/terminal.png, docs/report.png, docs/worklist.png and docs/social-preview.png.
 import { spawn } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -14,7 +14,7 @@ const docs = join(root, 'docs');
 const work = mkdtempSync(join(tmpdir(), 'focuswalk-images-'));
 const site = await startSite({}, 4173);
 
-const pages = ['/focus.html', '/obscured.html', '/reflow.html', '/clean.html'];
+const pages = ['/focus.html', '/menu.html', '/trap.html', '/overimage.html', '/inventory.html'];
 const reportFile = join(work, 'report.html');
 // Not spawnSync: the demo server lives in this process and has to keep answering.
 const run = await new Promise((done) => {
@@ -25,7 +25,6 @@ const run = await new Promise((done) => {
   child.stdout.on('data', (d) => { stdout += d; });
   child.on('close', () => done({ stdout }));
 });
-await site.close();
 
 const esc = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 const COLORS = { 31: '#ff8f85', 32: '#7ee2a0', 33: '#ffd166', 36: '#8cc4ff', 2: '#93a0b1', 1: '#ffffff' };
@@ -47,7 +46,7 @@ const terminal = shell(`<div class="win"><div class="bar"><i></i><i></i><i></i><
 
 const social = shell(`<div class="card"><p class="name">focuswalk</p>
   <p class="line">WCAG 2.2 AA audit for a whole site.</p>
-  <p class="sub">Runs axe-core, then presses Tab through every page in real Chrome to catch what rule engines miss: missing focus rings, focus hidden under sticky headers, sideways scroll.</p>
+  <p class="sub">Runs axe-core, then uses every page the way a keyboard user does, in real Chrome: missing focus rings, keyboard traps, hover-only menus, text too faint over photos.</p>
   <pre><span class="prompt">$</span> npx focuswalk https://example.org</pre>
   <p class="by">Open source · MIT · by Mike Sewell at Automate Impact</p></div>`, `
   body { width: 1280px; height: 640px; }
@@ -74,8 +73,14 @@ await shoot(social, 'social-preview.png', { width: 1280, height: 640 }, { x: 0, 
   await page.locator('details').first().evaluate((d) => { d.open = true; });
   const bottom = await page.locator('.rule').nth(1).evaluate((el) => el.getBoundingClientRect().bottom + scrollY + 8);
   await page.screenshot({ path: join(docs, 'report.png'), fullPage: true, clip: { x: 0, y: 0, width: 1180, height: Math.round(bottom) } });
+  // The worklist: from "Check these by hand" down to the forms.
+  const from = await page.locator('h2', { hasText: 'Check these by hand' }).evaluate((el) => el.getBoundingClientRect().top + scrollY - 24);
+  const to = await page.locator('h3', { hasText: 'Heading outlines' }).evaluate((el) => el.getBoundingClientRect().top + scrollY - 8);
+  await page.waitForLoadState('networkidle');
+  await page.screenshot({ path: join(docs, 'worklist.png'), fullPage: true, clip: { x: 0, y: Math.round(from), width: 1180, height: Math.round(to - from) } });
   await page.close();
 }
 await browser.close();
+await site.close();
 rmSync(work, { recursive: true, force: true });
-console.log(readFileSync(join(docs, 'terminal.png')).length > 0 ? 'wrote docs/terminal.png, docs/report.png, docs/social-preview.png' : 'failed');
+console.log(readFileSync(join(docs, 'terminal.png')).length > 0 ? 'wrote docs/terminal.png, docs/report.png, docs/worklist.png, docs/social-preview.png' : 'failed');

@@ -2,7 +2,11 @@ import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 import { runAxe } from './checks/axe.mjs';
 import { walkKeyboard } from './checks/keyboard.mjs';
-import { checkMovingVideo, checkReflow } from './checks/layout.mjs';
+import { checkMovingVideo, checkReflow, checkTextSpacing } from './checks/layout.mjs';
+import { measureContrastOnImages } from './checks/contrast.mjs';
+import { checkUnreachable, checkHoverMenus, checkDisclosures } from './checks/interact.mjs';
+import { takeInventory } from './inventory.mjs';
+import { checkAcrossPages } from './site.mjs';
 import { discoverFromSitemap } from './sitemap.mjs';
 
 export { renderConsole } from './report/console.mjs';
@@ -46,7 +50,7 @@ async function auditPage(browser, url, opts) {
     ...(opts.storageState ? { storageState: opts.storageState } : {}),
   });
   const page = await context.newPage();
-  const result = { url, status: null, error: null, issues: [], needsReview: [], tabStops: 0, notes: [] };
+  const result = { url, status: null, error: null, issues: [], needsReview: [], review: null, tabStops: 0, notes: [] };
   try {
     let res;
     try {
@@ -75,17 +79,37 @@ async function auditPage(browser, url, opts) {
       }
     }
 
+    // Order matters. First everything that only looks at the page, then the keyboard walk,
+    // then the checks that operate or resize it.
     const axe = await runAxe(page);
-    result.needsReview = axe.needsReview;
     result.engine = axe.engine;
+    result.review = await takeInventory(page);
+    const contrast = await measureContrastOnImages(page, axe.unmeasuredContrast);
+    // What is left for a person after measuring: axe's other undecided rules, plus the text
+    // whose background passes in some places and fails in others.
+    result.needsReview = axe.needsReview
+      .map((r) => (r.id === 'color-contrast' ? { ...r, count: r.count - contrast.resolved - contrast.issues.length } : r))
+      .filter((r) => r.count > 0);
+    result.review.contrast = contrast.unresolved;
     const video = await checkMovingVideo(page);
+    const unreachable = await checkUnreachable(page);
+    const spacing = await checkTextSpacing(page);
+
     const keyboard = await walkKeyboard(page, { maxStops: opts.maxTabStops });
     result.tabStops = keyboard.stops;
     if (keyboard.capped) result.notes.push(`stopped after ${opts.maxTabStops} tab stops; the rest of the page was not walked`);
     if (keyboard.framesSkipped) result.notes.push(`${keyboard.framesSkipped} embedded frame(s) take focus; focus inside them was not checked`);
-    for (const name of keyboard.dialogsOpened) result.notes.push(`a popup ("${name}") opened during the audit and took keyboard focus; what is behind it was not fully walked. Use --storage-state with the popup already dismissed to audit the page itself`);
+    for (const name of keyboard.dialogsOpened) result.notes.push(`a popup ("${name}") opened during the audit and covered the page; what is behind it was not fully walked. Use --storage-state with the popup already dismissed to audit the page itself`);
+
+    // A popup that has taken over the page would make these report on the popup, not the page.
+    let menus = [], toggles = { issues: [], notes: [] };
+    if (!keyboard.dialogsOpened.length) {
+      menus = await checkHoverMenus(page);
+      toggles = await checkDisclosures(page);
+      result.notes.push(...toggles.notes);
+    }
     const reflow = await checkReflow(page);
-    result.issues = [...axe.issues, ...video, ...keyboard.issues, ...reflow];
+    result.issues = [...axe.issues, ...contrast.issues, ...video, ...unreachable, ...spacing, ...keyboard.issues, ...menus, ...toggles.issues, ...reflow];
     return result;
   } catch (e) {
     result.error = `audit failed: ${String(e.message).split('\n')[0]}`;
@@ -154,6 +178,7 @@ export async function audit(target, options = {}) {
       }
     };
     await Promise.all(Array.from({ length: Math.max(1, Math.min(opts.concurrency, urls.length)) }, worker));
+    checkAcrossPages(pages);
 
     return {
       tool: 'focuswalk', version, target: start.origin, discovery, startedAt, finishedAt: new Date().toISOString(),

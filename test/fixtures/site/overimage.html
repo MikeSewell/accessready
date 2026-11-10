@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Text over images</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main, header { padding: 24px; }
+  a { color: #0b4a8f; }
+  button, input { font: inherit; padding: 8px 12px; }
+  .on-dark, .on-split { width: 260px; height: 120px; margin: 0 0 16px; padding: 12px; box-sizing: border-box; font-weight: 700; }
+  .on-dark { background-image: url(dark.png); }
+  .on-split { background-image: url(split.png); }
+  #readable { color: #fff; }
+  #faint, #icon { color: #3a3a3a; }
+  #mixed { color: #555; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Text over images</h1>
+  <p id="readable" class="on-dark">White text on a dark photo is readable everywhere.</p>
+  <p id="faint" class="on-dark">Dark grey text on a dark photo is readable nowhere.</p>
+  <p id="icon" class="on-dark" aria-hidden="true">&#9678;</p>
+  <p id="mixed" class="on-split">This text crosses from a black area into a white one.</p>
+</main>
+
+</body>
+</html>

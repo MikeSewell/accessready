@@ -40,5 +40,10 @@ export async function runAxe(page) {
 
   // "Incomplete" means axe could not decide, for example text over a photo. A person has to look.
   const needsReview = results.incomplete.map((v) => ({ id: v.id, title: v.help, count: v.nodes.length, helpUrl: v.helpUrl }));
-  return { issues, needsReview, engine: `axe-core ${results.testEngine.version}` };
+  // Contrast that axe could not compute can be measured from a screenshot. Only elements in
+  // the main document with a plain selector; frames and shadow roots stay for a person.
+  const unmeasuredContrast = (results.incomplete.find((v) => v.id === 'color-contrast')?.nodes || [])
+    .filter((n) => n.target.length === 1 && typeof n.target[0] === 'string')
+    .map((n) => n.target[0]);
+  return { issues, needsReview, unmeasuredContrast, engine: `axe-core ${results.testEngine.version}` };
 }
