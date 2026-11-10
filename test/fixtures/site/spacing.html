@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Text spacing</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main, header { padding: 24px; }
+  a { color: #0b4a8f; }
+  button, input { font: inherit; padding: 8px 12px; }
+  /* Monospace and ch units, so the text fits with two characters to spare in any font. */
+  #tight-box { font-family: monospace; width: 19ch; white-space: nowrap; overflow: hidden; background: #e3ecf7; }
+  #already-cut { width: 260px; height: 20px; overflow: hidden; background: #f3e9d2; margin: 12px 0; }
+  #roomy-box { width: 260px; overflow: hidden; background: #e3f7e6; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Text spacing</h1>
+  <div id="tight-box">Open nine to five</div>
+  <div id="already-cut">This box cuts its text off even at normal spacing, on purpose, so it is not blamed on spacing.</div>
+  <div id="roomy-box">This box grows with its text.</div>
+</main>
+
+</body>
+</html>

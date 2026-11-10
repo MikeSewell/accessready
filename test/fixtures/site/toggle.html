@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Buttons that open things</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main, header { padding: 24px; }
+  a { color: #0b4a8f; }
+  button, input { font: inherit; padding: 8px 12px; }
+  #mouse-only { display: inline-block; padding: 8px 12px; border: 1px solid #555; cursor: pointer; }
+  #lazy-dialog { position: fixed; top: 80px; left: 80px; width: 320px; padding: 24px; background: #fff; border: 2px solid #111; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Buttons that open things</h1>
+  <div id="mouse-only" role="button" tabindex="0" aria-expanded="false" aria-controls="panel-a">Shipping details</div>
+  <div id="panel-a" hidden><p>Shown by a click handler only.</p></div>
+  <p><button id="works" type="button" aria-expanded="false" aria-controls="panel-b">Returns policy</button></p>
+  <div id="panel-b" hidden><p>Shown by a real button.</p></div>
+  <p><button id="opens-dialog" type="button" aria-expanded="false" aria-controls="lazy-dialog">Contact us</button></p>
+  <div id="lazy-dialog" role="dialog" aria-modal="true" aria-labelledby="lazy-title" hidden>
+    <h2 id="lazy-title">Contact us</h2>
+    <button id="lazy-close" type="button">Close</button>
+  </div>
+</main>
+<script>const wire = (id, panel, on) => {
+    const el = document.getElementById(id), target = document.getElementById(panel);
+    const set = (open) => { target.hidden = !open; el.setAttribute('aria-expanded', String(open)); };
+    el.addEventListener(on, () => set(el.getAttribute('aria-expanded') !== 'true'));
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') set(false); });
+  };
+  // A div with only a click handler: Enter and Space do nothing.
+  wire('mouse-only', 'panel-a', 'click');
+  wire('works', 'panel-b', 'click');
+  // Opens a dialog but leaves focus on the button behind it.
+  wire('opens-dialog', 'lazy-dialog', 'click');
+  document.getElementById('lazy-close').addEventListener('click', () => document.getElementById('opens-dialog').click());</script>
+</body>
+</html>

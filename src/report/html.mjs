@@ -1,6 +1,7 @@
 // A single self-contained HTML file written for the person who owns the site, not only the
 // developer who fixes it. It has to pass its own audit; test/report.test.mjs checks that.
 import { criterionLabel, WHY, UNDERSTANDING } from '../wcag.mjs';
+import { coverage } from '../coverage.mjs';
 import { pathOf } from './console.mjs';
 
 const EXAMPLES = 5;
@@ -45,18 +46,111 @@ function ruleCard(group) {
     </section>`;
 }
 
+const LIST_CAP = 60;
+const more = (n) => (n > LIST_CAP ? `<p class="meta">And ${n - LIST_CAP} more. The JSON output lists every one.</p>` : '');
+const onPages = (set) => (set.size === 1 ? esc(pathOf([...set][0])) : `${set.size} pages, first on ${esc(pathOf([...set][0]))}`);
+
+// Collapses the per-page inventories into one list per kind, with the pages each item is on.
+function collect(pages, pick, keyOf) {
+  const items = new Map();
+  for (const page of pages) for (const item of (page.review ? pick(page.review) : [])) {
+    const key = keyOf(item);
+    if (!items.has(key)) items.set(key, { item, pages: new Set() });
+    items.get(key).pages.add(page.url);
+  }
+  return [...items.values()];
+}
+
+// The part no tool can judge, laid out so a person can work down it instead of hunting.
+function byHand(result) {
+  const pages = result.pages.filter((p) => p.review);
+  const parts = [];
+
+  const images = collect(pages, (r) => r.images, (i) => `${i.src}|${i.alt}`);
+  if (images.length) {
+    parts.push(`
+  <h3>Images and their descriptions</h3>
+  <p>A screen reader reads the description in place of the image. For each one: does it say what the image is there for? An image marked decorative is skipped entirely, which is right for ornaments and wrong for anything that carries information. Images that contain text need that text in the description.</p>
+  <ul class="rows">${images.slice(0, LIST_CAP).map(({ item, pages: on }) => `
+    <li><img src="${esc(item.src)}" alt="" width="72" height="72">
+      <div><p>${item.alt === null ? '<strong>No description at all.</strong>' : item.alt === '' ? '<strong>Marked decorative</strong>, so screen readers skip it.' : `&ldquo;${esc(item.alt)}&rdquo;`}</p>
+      <p class="meta">${onPages(on)}${item.linked ? ' · this image is a link, so the description is also the link text' : ''}</p></div></li>`).join('')}
+  </ul>${more(images.length)}`);
+  }
+
+  const media = collect(pages, (r) => r.media.filter((m) => !m.background), (m) => m.src);
+  if (media.length) {
+    parts.push(`
+  <h3>Video and audio</h3>
+  <p>Each needs accurate captions, and video needs its visual content described if the soundtrack does not already cover it. Auto-generated captions have to be reviewed by a person.</p>
+  <ul class="plain">${media.slice(0, LIST_CAP).map(({ item, pages: on }) => `
+    <li>${esc(item.kind)}${item.title ? ` &ldquo;${esc(item.title)}&rdquo;` : ''}: <a href="${esc(item.src)}">${esc(item.src.replace(/^https?:\/\//, '').slice(0, 70))}</a>
+      <span class="meta">· ${item.captions === true ? 'has a caption track; check it is accurate' : item.captions === false ? 'no caption track found' : 'captions are set inside the player; check there'} · ${onPages(on)}</span></li>`).join('')}
+  </ul>${more(media.length)}`);
+  }
+
+  const links = collect(pages, (r) => r.vagueLinks, (l) => `${l.text}|${l.href}`);
+  if (links.length) {
+    parts.push(`
+  <h3>Links that do not say where they go</h3>
+  <p>Screen reader users often move through a page by its links alone. Out of context, these all sound the same.</p>
+  <ul class="plain">${links.slice(0, LIST_CAP).map(({ item, pages: on }) => `
+    <li>&ldquo;${esc(item.text)}&rdquo; goes to <a href="${esc(item.href)}">${esc(item.href.replace(/^https?:\/\//, '').slice(0, 70))}<span class="sr"> (linked as ${esc(item.text)})</span></a> <span class="meta">· ${onPages(on)}</span></li>`).join('')}
+  </ul>${more(links.length)}`);
+  }
+
+  const forms = pages.flatMap((p) => p.review.forms.map((f) => ({ ...f, url: p.url })));
+  if (forms.length) {
+    parts.push(`
+  <h3>Forms</h3>
+  <p>Fill each one in using only the keyboard. Then submit it with mistakes: is every error described in words, next to its field, and does it say how to fix it?</p>
+  <ul class="plain">${forms.slice(0, LIST_CAP).map((f) => `
+    <li><a href="${esc(f.url)}">${esc(pathOf(f.url))}<span class="sr"> form: ${esc(f.name || 'unnamed')}</span></a> ${f.name ? `&ldquo;${esc(f.name)}&rdquo;` : 'a form with no name'} <span class="meta">· ${plural(f.fields, 'field')}, ${f.required} required</span></li>`).join('')}
+  </ul>${more(forms.length)}`);
+  }
+
+  const contrast = pages.flatMap((p) => p.review.contrast.filter((c) => c.text).map((c) => ({ ...c, url: p.url })));
+  if (contrast.length) {
+    parts.push(`
+  <h3>Text over images</h3>
+  <p>This text sits on a photo, gradient or video. Its contrast was measured from a screenshot and is good in some places and too low in others, so someone has to look at whether it is readable.</p>
+  <ul class="plain">${contrast.slice(0, LIST_CAP).map((c) => `
+    <li>&ldquo;${esc(c.text)}&rdquo; <span class="meta">· ${esc(pathOf(c.url))} · ${c.worst === undefined ? 'could not be measured' : `between ${c.worst}:1 and ${c.best}:1, needs ${c.needs}:1`}</span></li>`).join('')}
+  </ul>${more(contrast.length)}`);
+  }
+
+  const outlines = pages.filter((p) => p.review.headings.length);
+  if (outlines.length) {
+    parts.push(`
+  <h3>Heading outlines</h3>
+  <p>Screen reader users skim a page by its headings, like a table of contents. Read each outline by itself: does it describe the page, in an order that makes sense?</p>
+  ${outlines.slice(0, LIST_CAP).map((p) => `<details>
+    <summary>${esc(pathOf(p.url))}<span class="sr"> heading outline</span></summary>
+    <ul class="outline">${p.review.headings.map((h) => `<li style="margin-left:${(h.level - 1) * 18}px"><span class="meta">h${h.level}</span> ${esc(h.text) || '<strong>empty heading</strong>'}</li>`).join('')}</ul>
+  </details>`).join('\n  ')}${more(outlines.length)}`);
+  }
+
+  const other = new Map();
+  for (const page of result.pages) for (const r of page.needsReview) {
+    if (r.id === 'color-contrast') continue; // listed above, with measurements
+    const item = other.get(r.id) || { title: r.title, count: 0 };
+    item.count += r.count;
+    other.set(r.id, item);
+  }
+  if (other.size) {
+    parts.push(`
+  <h3>Other things the rules could not decide</h3>
+  <ul class="plain">${[...other.values()].map((r) => `<li>${esc(r.title)} (${plural(r.count, 'element')})</li>`).join('')}</ul>`);
+  }
+  return parts.join('\n');
+}
+
 export function renderHtml(result) {
+  const cover = coverage().counts;
   const t = result.totals;
   const failures = groupByRule(result.pages, 'failure');
   const advice = groupByRule(result.pages, 'advice');
   const date = new Date(result.finishedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-
-  const review = new Map();
-  for (const page of result.pages) for (const r of page.needsReview) {
-    const item = review.get(r.id) || { title: r.title, count: 0 };
-    item.count += r.count;
-    review.set(r.id, item);
-  }
 
   const verdict = t.errors
     ? `${plural(t.errors, 'page')} could not be checked`
@@ -113,6 +207,16 @@ export function renderHtml(result) {
   thead th { color: #a9b4c2; font-size: 15px; }
   tbody th { font-weight: 400; width: 46%; }
   ul.plain { padding-left: 20px; }
+  ul.rows { list-style: none; padding: 0; margin: 0 0 12px; }
+  ul.rows li { display: flex; gap: 14px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid #2a3544; }
+  ul.rows img { flex: none; width: 72px; height: 72px; object-fit: contain; background: #0b0f14; border: 1px solid #2a3544; border-radius: 6px; }
+  ul.rows div { min-width: 0; overflow-wrap: anywhere; }
+  ul.rows p { margin: 0 0 2px; }
+  ul.outline { list-style: none; padding: 0; margin: 6px 0 14px; }
+  ul.outline li { margin-bottom: 4px; }
+  main h3 { margin-top: 28px; }
+  .rule h3 { margin-top: 0; }
+  ul.plain li { overflow-wrap: anywhere; }
   ul.plain li { margin-bottom: 6px; }
   footer { margin-top: 56px; margin-bottom: 40px; padding-top: 20px; border-top: 1px solid #2a3544; color: #a9b4c2; font-size: 15px; }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
@@ -129,13 +233,13 @@ export function renderHtml(result) {
       <li><b>${t.failures}</b> problems to fix</li>
       <li><b>${failures.length}</b> kinds of problem</li>
       <li><b>${t.pages}</b> pages checked</li>
-      <li><b>${t.needsReview}</b> items a person must check</li>
+      <li><b>${cover.checked} of ${cover.total}</b> WCAG requirements with an automated check</li>
     </ul>
   </div>
 </header>
 <main>
   <h2>What this report is</h2>
-  <p>Each page was opened in Chrome and tested two ways. First with axe-core, a widely used set of accessibility rules that covers things like color contrast, missing labels and image descriptions. Then by pressing the Tab key through the whole page, the way someone who cannot use a mouse does, to see whether they can always tell where they are.</p>
+  <p>Each page was opened in Chrome and tested two ways. First with axe-core, a widely used set of accessibility rules that covers things like color contrast, missing labels and image descriptions. Then by using the page the way someone who cannot use a mouse does: pressing the Tab key through every link and button, opening menus from the keyboard, widening the text spacing and narrowing the window.</p>
   <p>Automated checks find some accessibility problems, not all of them. A clean report is a good sign. It is not proof that a site meets WCAG or any law.</p>
 
   <h2>What to fix</h2>
@@ -145,16 +249,18 @@ export function renderHtml(result) {
   <p>These are recognized good practice. They are not WCAG failures.</p>
   ${advice.map(ruleCard).join('').replaceAll('class="rule"', 'class="rule note"')}` : ''}
 
-  <h2>What a person still has to check</h2>
-  ${review.size ? `<p>The rules engine flagged these for a person to look at, because it could not decide by itself:</p>
-  <ul class="plain">${[...review.values()].map((r) => `<li>${esc(r.title)} (${plural(r.count, 'element')})</li>`).join('')}</ul>` : ''}
-  <p>No tool can judge the following, on any site:</p>
+  <h2>Check these by hand</h2>
+  <p>No tool can tell whether a description makes sense or a form is usable. This is everything on the site that needs a person's judgment, gathered in one place.</p>
+  ${byHand(result)}
+  <h3>What is not listed anywhere</h3>
+  <p>Of the ${cover.total} WCAG 2.2 A and AA requirements, this audit has automated checks for ${cover.checked} and lists what to review for ${cover.guided} more. The other ${cover.manual} need a person and cannot be listed in advance, among them:</p>
   <ul class="plain">
-    <li>Whether image descriptions and link text make sense to someone who cannot see the page.</li>
-    <li>Whether menus, popups and forms can be operated with the keyboard alone, and whether error messages are announced.</li>
-    <li>How the page sounds in a screen reader such as VoiceOver or NVDA.</li>
-    <li>Whether videos have accurate captions.</li>
+    <li>How the site sounds in a screen reader such as VoiceOver or NVDA.</li>
+    <li>Whether custom widgets, such as sliders, carousels and drag and drop, work from the keyboard.</li>
+    <li>Whether status messages (&ldquo;added to cart&rdquo;, &ldquo;3 results&rdquo;) are announced.</li>
+    <li>Whether anything flashes, times out, or changes just because it received focus.</li>
   </ul>
+  <p><a href="https://github.com/MikeSewell/focuswalk/blob/main/docs/COVERAGE.md">See the full list, requirement by requirement</a>.</p>
 
   <h2>Pages checked</h2>
   <table>

@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { audit } from '../src/index.mjs';
 import { startSite, ids } from './helpers.mjs';
 
-const PAGES = ['clean', 'focus', 'obscured', 'reflow', 'video', 'rules', 'headings', 'banner', 'frame', 'shadow', 'skiplink', 'popup'];
+const PAGES = ['clean', 'focus', 'obscured', 'reflow', 'video', 'rules', 'headings', 'banner', 'frame', 'shadow', 'skiplink', 'popup', 'popup-behind', 'trap', 'unreachable', 'spacing', 'menu', 'toggle', 'overimage', 'inventory'];
 let site, result;
 const page = (name) => result.pages[PAGES.indexOf(name)];
 
@@ -96,14 +96,84 @@ test('a skip link that slides in on focus is measured after it arrives', () => {
 test('a popup that opens mid-walk and traps focus is called out', () => {
   const p = page('popup');
   assert.equal(p.notes.length, 1);
-  assert.match(p.notes[0], /^a popup \("Join our newsletter"\) opened during the audit and took keyboard focus/);
-  assert.ok(!p.issues.some((i) => i.selector === '#third'), 'the link behind the popup is not judged');
+  assert.match(p.notes[0], /^a popup \("Join our newsletter"\) opened during the audit and covered the page/);
+  assert.deepEqual(p.issues, []);
+});
+
+test('links left behind a popup that opened mid-walk are not reported as hidden', () => {
+  const p = page('popup-behind');
+  assert.deepEqual(p.issues, []);
+  assert.match(p.notes[0], /^a popup \("Join our newsletter"\) opened during the audit/);
+});
+
+test('a field that swallows Tab is a keyboard trap; a date field is not', () => {
+  const p = page('trap');
+  assert.deepEqual(p.issues.map((i) => [i.id, i.selector, i.wcag[0]]), [['keyboard-trap', '#sticky', '2.1.2']]);
+  // The link, the date field (several Tab presses, one stop) and the field that traps.
+  assert.equal(p.tabStops, 3);
+});
+
+test('controls that cannot take focus fail; a pointer cursor alone is a note', () => {
+  const p = page('unreachable');
+  assert.deepEqual(p.issues.filter((i) => i.kind === 'failure').map((i) => [i.id, i.selector]), [['keyboard-unreachable', '#fake-button'], ['keyboard-unreachable', '#inline-handler']]);
+  // Not reported: the real button, the card with a link inside, the label, the toolbar item.
+  assert.deepEqual(p.issues.filter((i) => i.kind === 'advice').map((i) => [i.id, i.selector]), [['looks-clickable', '#pointer-only']]);
+  assert.equal(p.tabStops, 4);
+});
+
+test('text cut off by wider spacing is reported, text already cut off is not', () => {
+  assert.deepEqual(page('spacing').issues.map((i) => [i.id, i.selector, i.wcag[0]]), [['text-spacing', '#tight-box', '1.4.12']]);
+});
+
+test('a menu that opens on hover only fails; focus and button menus pass', () => {
+  const p = page('menu');
+  assert.deepEqual(ids(p), ['hover-only-menu']);
+  assert.match(p.issues[0].message, /^the menu under "Programs" opens when the mouse hovers over it but not from the keyboard, so 2 links cannot be reached/);
+});
+
+test('a button that only answers the mouse fails; a dialog that ignores focus is a note', () => {
+  const p = page('toggle');
+  assert.deepEqual(p.issues.map((i) => [i.kind, i.id, i.selector]), [
+    ['failure', 'keyboard-activation', 'button "Shipping details"'],
+    ['advice', 'dialog-focus', 'button "Contact us"'],
+  ]);
+  assert.deepEqual(p.notes, [], 'every button was closed again');
+});
+
+test('contrast over an image is measured: fails everywhere, passes everywhere, or mixed', () => {
+  const p = page('overimage');
+  assert.deepEqual(p.issues.map((i) => [i.id, i.selector]), [['contrast-on-image', '#faint']]);
+  assert.match(p.issues[0].message, /reaches 1\.66:1 at best .* needs 4\.5:1$/);
+  // #readable passed everywhere and is no longer waiting for review; #mixed still is.
+  // A faint icon glyph is not text: it is left for a person, without a measurement.
+  assert.deepEqual(p.review.contrast.map((c) => [c.selector, c.worst < 4.5, c.best > 4.5]), [['#icon', false, false], ['#mixed', true, true]]);
+  assert.deepEqual(p.needsReview.map((r) => [r.id, r.count]), [['color-contrast', 2]]);
+});
+
+test('the inventory lists what a person has to look at', () => {
+  const r = page('inventory').review;
+  assert.deepEqual(r.images.map((i) => [new URL(i.src).pathname, i.alt]), [['/photo.png', 'Volunteers sorting food donations'], ['/photo.png', '']]);
+  assert.deepEqual(r.vagueLinks.map((l) => l.text), ['Click here']);
+  assert.deepEqual(r.forms, [{ name: 'Newsletter sign-up', fields: 2, required: 1 }]);
+  assert.deepEqual(r.headings, [{ level: 1, text: 'Things a person checks' }, { level: 2, text: 'Our work' }]);
+  assert.equal(r.title, 'Things a person checks');
+  assert.deepEqual(page('video').review.media.map((m) => [m.kind, m.background, m.captions]), [['video', true, false], ['video', true, false]]);
 });
 
 test('totals add up', () => {
-  assert.deepEqual(result.totals, { pages: 12, failures: 8, advice: 2, needsReview: result.totals.needsReview, errors: 0 });
+  assert.deepEqual(result.totals, { pages: 20, failures: 15, advice: 4, needsReview: result.totals.needsReview, errors: 0 });
   assert.equal(result.standard, 'WCAG 2.2 AA');
   assert.match(result.engine, /^axe-core \d+\.\d+\.\d+$/);
+});
+
+test('pages are compared with each other: navigation order and shared titles', async () => {
+  const r = await audit(site.origin, { paths: ['/nav-a.html', '/nav-b.html', '/nav-c.html', '/nav-d.html'] });
+  const found = r.pages.map((p) => p.issues.map((i) => `${i.kind}:${i.id}`));
+  // a and b share a title; c lists Donate before Programs; d only drops a link, which is fine.
+  assert.deepEqual(found, [['advice:duplicate-title'], ['advice:duplicate-title'], ['failure:inconsistent-navigation'], []]);
+  assert.match(r.pages[2].issues[0].message, /"Programs" in a different place .* \(usual order: Home, Programs, Donate, Contact\)$/);
+  assert.ok(r.pages.every((p) => p.issues.every((i) => i.scope === 'site')));
+  assert.deepEqual(r.totals, { pages: 4, failures: 1, advice: 2, needsReview: 0, errors: 0 });
 });
 
 test('with dismissal off, the banner is reported as covering the page', async () => {

@@ -18,8 +18,10 @@ export function pathOf(url) {
 export function renderPage(page, { color = false } = {}) {
   const c = palette(color);
   const lines = [];
-  const failures = page.issues.filter((i) => i.kind === 'failure');
-  const advice = page.issues.filter((i) => i.kind === 'advice');
+  // Findings that come from comparing pages are printed once, in the summary.
+  const own = page.issues.filter((i) => i.scope !== 'site');
+  const failures = own.filter((i) => i.kind === 'failure');
+  const advice = own.filter((i) => i.kind === 'advice');
   const head = page.error
     ? c.red(page.error)
     : failures.length
@@ -31,7 +33,7 @@ export function renderPage(page, { color = false } = {}) {
   lines.push(`${c.bold(pathOf(page.url))}  ${head}${extra.length ? '  ' + extra.join('  ') : ''}`);
 
   const groups = new Map();
-  for (const issue of page.issues) {
+  for (const issue of own) {
     const key = `${issue.kind}|${issue.id}`;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(issue);
@@ -72,6 +74,17 @@ export function renderSummary(result, { color = false } = {}) {
     if (rows.length) lines.push('');
   }
 
+  const acrossSite = result.pages.flatMap((p) => p.issues.filter((i) => i.scope === 'site').map((i) => ({ ...i, path: pathOf(p.url) })));
+  if (acrossSite.length) {
+    lines.push(c.bold('Across the site'));
+    for (const i of acrossSite) {
+      const mark = i.kind === 'failure' ? c.red('FAIL') : c.yellow('note');
+      lines.push(`  ${mark}  ${c.bold(i.path)}  ${i.title}  ${c.dim(criterionLabel(i.wcag))}`);
+      lines.push(`        ${i.message}`);
+    }
+    lines.push('');
+  }
+
   const verdict = t.errors
     ? c.red(`${plural(t.errors, 'page')} could not be audited`)
     : t.failures
@@ -79,7 +92,7 @@ export function renderSummary(result, { color = false } = {}) {
       : c.green('No automated WCAG 2.2 AA failures');
   lines.push(`${c.bold(result.target)}  ${verdict} across ${plural(t.pages, 'page')}  ${c.dim(`(${result.discovery})`)}`);
   if (t.advice) lines.push(c.dim(`${plural(t.advice, 'best-practice note')}; these do not fail the run unless --strict is set`));
-  if (t.needsReview) lines.push(c.dim(`${plural(t.needsReview, 'element')} axe-core could not judge (for example text over an image); a person has to look at them`));
+  if (t.needsReview) lines.push(c.dim(`${plural(t.needsReview, 'element')} the checks could not judge; a person has to look at them`));
   lines.push(c.dim('Automated checks find some accessibility problems, not all of them. A pass here is not a statement of conformance.'));
   return lines.join('\n');
 }
