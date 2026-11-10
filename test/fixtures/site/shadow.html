@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shadow DOM</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+
+</style>
+</head>
+<body>
+<main>
+  <h1>Shadow DOM</h1>
+  <fancy-button></fancy-button>
+</main>
+<script>
+  customElements.define("fancy-button", class extends HTMLElement {
+    constructor() {
+      super();
+      this.attachShadow({ mode: "open" }).innerHTML = "<style>button { font: inherit; padding: 8px 12px; } button:focus { outline: none; }</style><button type=\"button\">Button inside a shadow root</button>";
+    }
+  });
+</script>
+</body>
+</html>

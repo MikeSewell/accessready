@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Covered focus</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  main { padding-bottom: 0; }
+  .spacer { height: 2400px; }
+  .last { margin: 0; }
+  #sticky-bar { position: fixed; left: 0; right: 0; bottom: 0; height: 140px; background: #1c2733; color: #fff; padding: 0 24px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Covered focus</h1>
+  <p><a id="top-link" href="clean.html">A link at the top</a></p>
+  <div class="spacer"></div>
+  <p class="last"><a id="bottom-link" href="clean.html">A link at the very bottom</a></p>
+</main>
+<aside id="sticky-bar" aria-label="Announcement"><p>A bar fixed to the bottom of the window.</p></aside>
+</body>
+</html>
