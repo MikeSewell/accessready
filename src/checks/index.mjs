@@ -32,7 +32,10 @@ import * as forms from './forms.mjs';
 import * as content from './content.mjs';
 import * as language from './language.mjs';
 
-export const MODULES = [keyboard, interact, layout, contrast, site, sitewide, documents, pointer, widgets, forms, content, language];
+// The optional AI review. Its probe does nothing unless the run asked for it (opts.ai).
+import * as ai from '../ai/look.mjs';
+
+export const MODULES = [keyboard, interact, layout, contrast, site, sitewide, documents, pointer, widgets, forms, content, language, ai];
 
 export const RULES = Object.assign({}, ...MODULES.map((m) => m.rules || {}));
 export const PROBES = MODULES.flatMap((m) => m.probes || []);

@@ -11,6 +11,8 @@ import { takeInventory } from './inventory.mjs';
 import { checkAcrossPages } from './site.mjs';
 import { discoverFromSitemap } from './sitemap.mjs';
 import { inLevel, LEVELS } from './wcag.mjs';
+import { resolveAi } from './ai/providers.mjs';
+import { reviewWithAi } from './ai/review.mjs';
 
 export { renderConsole } from './report/console.mjs';
 export { renderHtml } from './report/html.mjs';
@@ -285,7 +287,7 @@ export async function audit(target, options = {}) {
   const opts = {
     paths: [], sitemap: null, max: 40, concurrency: 2, timeout: 45000, maxTabStops: 150,
     viewports: ['desktop', 'phone'], browsers: ['auto'], level: 'AA',
-    dismiss: true, proxy: null, storageState: null,
+    dismiss: true, proxy: null, storageState: null, ai: null,
     onPage: () => {},
     ...options,
   };
@@ -295,6 +297,12 @@ export async function audit(target, options = {}) {
   if (!LEVELS.includes(opts.level)) throw new AccessReadyError(`Level must be A, AA or AAA, got ${opts.level}`);
   const viewports = opts.viewports.map(parseViewport);
   for (const b of opts.browsers) if (b !== 'auto' && !BROWSERS.includes(b)) throw new AccessReadyError(`Unknown browser: ${b}. Use auto, ${BROWSERS.join(', ')}`);
+  // The optional AI review: 'provider:model' or an object (see src/ai/providers.mjs).
+  if (opts.ai) {
+    const { ai, error } = resolveAi(opts.ai, opts.ai.env);
+    if (error) throw new AccessReadyError(error);
+    opts.ai = ai;
+  }
 
   let start;
   try { start = new URL(target); } catch { throw new AccessReadyError(`Not a URL: ${target}`); }
@@ -304,6 +312,9 @@ export async function audit(target, options = {}) {
   const browsers = [];
   try {
     for (const b of opts.browsers) browsers.push(await launch(b, opts.proxy));
+    // The AI review reads each page in one view only, the run's first screen size and
+    // browser, so the same page gives the same input and a rerun is answered from the cache.
+    if (opts.ai) opts.ai = { ...opts.ai, view: viewports[0].name, engine: engineOf(browsers[0]) };
 
     // What to audit: the paths given; or the one page named; or everything in the sitemap.
     // `siteUrls` is every page known to be part of the site, including sitemap entries past
@@ -362,7 +373,24 @@ export async function audit(target, options = {}) {
       for (const p of group) p.issues = p.issues.filter((i) => !i.wcag.length || i.wcag.some((n) => inLevel(n, opts.level)));
     }
     if (!viewports.some((v) => !v.isMobile)) pages[0]?.notes.push('reflow (1.4.10) is measured in a desktop window; add desktop to --viewports to check it');
+    // After every page, so the requests can be counted, capped and announced before the
+    // first one is sent. Its findings are judged once per page, not once per view.
+    // An AI failure never fails the audit: a fault in the review itself becomes a note.
+    let ai = null;
+    if (opts.ai) {
+      try { ai = await reviewWithAi(pages, opts); } catch (e) {
+        ai = { byUrl: new Map(), notes: [`AI review: could not finish: ${String(e.message).split('\n')[0]}`], summary: { provider: opts.ai.provider, model: opts.ai.model, endpoint: opts.ai.endpoint, failed: true } };
+      }
+      for (const p of pages) delete p.aiLook;
+    }
     const merged = mergeViews(pages);
+    if (ai) {
+      for (const p of merged) {
+        const found = ai.byUrl.get(p.url);
+        if (found) { p.issues.push(...found.issues.map((i) => ({ ...i, seenOn: null }))); p.notes.push(...found.notes); }
+      }
+      merged[0]?.notes.push(...ai.notes);
+    }
 
     return {
       tool: 'accessready', version, target: start.origin, discovery, startedAt, finishedAt: new Date().toISOString(),
@@ -370,6 +398,7 @@ export async function audit(target, options = {}) {
       standard: `WCAG 2.2 ${opts.level}`, level: opts.level,
       viewports: viewports.map((v) => v.name), browsers: [...new Set(pages.map((p) => p.browser))],
       totals: summarize(merged), pages: merged,
+      ...(ai ? { ai: ai.summary } : {}),
     };
   } finally {
     for (const b of browsers) await b.close().catch(() => {});

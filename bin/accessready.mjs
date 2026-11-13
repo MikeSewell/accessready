@@ -7,6 +7,8 @@ import { renderPage, renderSummary } from '../src/report/console.mjs';
 import { loadConfig, ignoreOnPage, ConfigError, CONFIG_FILE } from '../src/adopt/config.mjs';
 import { readBaseline, baselineFile, compareWithBaseline, baselineExitCode, BaselineError } from '../src/adopt/baseline.mjs';
 import { toSarif } from '../src/adopt/sarif.mjs';
+import { resolveAi } from '../src/ai/providers.mjs';
+import { describePlan, renderAiConsole } from '../src/ai/review.mjs';
 
 const HELP = `accessready ${version}
 WCAG 2.2 audit for a whole site: every page, on a phone and a desktop screen.
@@ -45,6 +47,41 @@ Options
   --no-color             plain output
   -v, --version
   -h, --help
+
+AI review (optional; you choose the provider and pay it yourself)
+  --ai <provider:model>  also judge wording and meaning with a model: image descriptions,
+                         images of text, link text, headings, labels, page titles,
+                         instructions that rely on color or shape, and names that change
+                         between pages. Providers:
+                           anthropic:<model>          key in ANTHROPIC_API_KEY
+                           openai:<model>             key in OPENAI_API_KEY
+                           gemini:<model>             key in GEMINI_API_KEY
+                           lmstudio:<model>           LM Studio at http://localhost:1234/v1
+                           ollama:<model>             Ollama at http://localhost:11434/v1
+                           openai-compatible:<model>  any Chat Completions server, with
+                                                      --ai-base-url
+                         ACCESSREADY_AI_KEY is used for any provider when set. The model
+                         name is the one your provider lists, for example
+                         ollama:qwen2.5vl:7b.
+                         Or use a coding-agent CLI you already pay for. It runs headless
+                         with the account it is logged in to, read-only, with its file
+                         and command tools off where the CLI allows, in an empty
+                         temporary folder. The model is optional (the CLI's default):
+                           claude-code[:<model>]      Claude Code (claude)
+                           codex[:<model>]            OpenAI Codex (codex)
+                           gemini-cli[:<model>]       Gemini CLI (gemini), text only
+                           qwen-code[:<model>]        Qwen Code (qwen), text only
+  --ai-base-url <url>    send AI requests here instead of the provider's usual address
+                         (API providers only)
+  --ai-max-requests <n>  most AI requests in one run (default 50; 0 uses only the cache)
+  --ai-no-cache          ask again instead of reusing answers kept in .accessready-cache/ai
+  --ai-no-images         send no images, only text (for text-only models)
+
+  The AI review sends each page's text, links, headings, form labels and images (scaled
+  down) to the provider you name, or through the CLI you name to its service. Do not use
+  it on pages whose content must not leave your machine, unless the model runs locally.
+  Its findings are likely problems for a person to confirm, marked as AI judgments; they
+  never fail the run unless --strict is set.
 
 Options given here win over the config file. Every ignore in it needs a reason:
   { "url": "http://localhost:3000", "level": "AA",
@@ -92,6 +129,11 @@ try {
       proxy: { type: 'string' },
       'no-dismiss': { type: 'boolean' },
       strict: { type: 'boolean' },
+      ai: { type: 'string' },
+      'ai-base-url': { type: 'string' },
+      'ai-max-requests': { type: 'string' },
+      'ai-no-cache': { type: 'boolean' },
+      'ai-no-images': { type: 'boolean' },
       'no-color': { type: 'boolean', default: false },
       version: { type: 'boolean', short: 'v', default: false },
       help: { type: 'boolean', short: 'h', default: false },
@@ -150,6 +192,26 @@ const level = flags.level.toUpperCase();
 if (!['A', 'AA', 'AAA'].includes(level)) fail(`--level must be A, AA or AAA, got "${flags.level}"`);
 if (flags['storage-state'] && !existsSync(flags['storage-state'])) fail(`--storage-state file not found: ${flags['storage-state']}`);
 
+// The AI review is checked here, before any browser starts, so a missing key or a typo in
+// the provider costs nothing.
+let ai = null;
+for (const f of ['ai-base-url', 'ai-max-requests', 'ai-no-cache', 'ai-no-images']) {
+  if (!given.ai && (given[f] !== undefined && given[f] !== false)) fail(`--${f} needs --ai <provider:model>`);
+}
+if (given.ai !== undefined) {
+  const max = given['ai-max-requests'];
+  if (max !== undefined && !/^\d+$/.test(max)) fail(`--ai-max-requests needs a whole number, got "${max}"`);
+  ai = {
+    use: given.ai,
+    baseUrl: given['ai-base-url'],
+    maxRequests: max === undefined ? undefined : Number(max),
+    cache: !given['ai-no-cache'],
+    images: !given['ai-no-images'],
+  };
+  const { error } = resolveAi(ai);
+  if (error) fail(`--ai: ${error}`);
+}
+
 // The baseline is read now, so a missing or broken file stops the run before a browser starts.
 const updateBaseline = !!given['update-baseline'];
 if (updateBaseline && !flags.baseline) fail('--update-baseline needs --baseline <file> (or "baseline" in the config file) to know where to write');
@@ -201,6 +263,7 @@ try {
     browsers,
     proxy: flags.proxy || null,
     dismiss: !flags['no-dismiss'],
+    ai: ai && { ...ai, onPlan: (plan) => say(describePlan(plan) + '\n') },
     // Ignored findings are left out of what is printed as each page finishes, too.
     onPage: (page) => { ignoreOnPage(page, ignores); say(renderPage(page, { color }) + '\n'); },
   });
@@ -214,6 +277,7 @@ try {
   const comparison = baseline ? compareWithBaseline(result, baseline) : null;
   if (comparison) result.baseline = { file: resolve(flags.baseline), known: comparison.known.length, new: comparison.new, fixed: comparison.fixed, notChecked: comparison.notChecked };
 
+  if (result.ai) say(renderAiConsole(result, { color }) + '\n');
   say(renderSummary(result, { color }));
   if (result.ignored) say(`${plural(result.ignored.length, 'finding')} ignored by ${configPath ? relative(process.cwd(), configPath) || CONFIG_FILE : CONFIG_FILE}; the JSON report lists each one with its reason`);
   if (comparison) say(renderBaseline(comparison));
