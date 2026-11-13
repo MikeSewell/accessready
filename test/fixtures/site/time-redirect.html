@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Redirects by itself</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  button { font: inherit; padding: 8px 12px; }
+
+</style>
+</head>
+<body>
+<main>
+  <h1>Redirects by itself</h1>
+  <p>This page goes back to the home page after ten minutes.</p>
+</main>
+<script>
+  setTimeout(() => { location.href = "clean.html"; }, 10 * 60 * 1000);
+</script>
+</body>
+</html>

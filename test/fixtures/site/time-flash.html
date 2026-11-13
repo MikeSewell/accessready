@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flashing</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  button { font: inherit; padding: 8px 12px; }
+
+</style>
+</head>
+<body>
+<main>
+  <h1>Flashing</h1>
+  <div id="strobe" style="width: 420px; max-width: 100%; height: 320px; background: #000;"></div>
+</main>
+<script>
+  // Black to white ten times a second: five flashes a second over a large area.
+  const box = document.getElementById("strobe");
+  let on = false;
+  setInterval(() => { on = !on; box.style.background = on ? "#fff" : "#000"; }, 100);
+</script>
+</body>
+</html>

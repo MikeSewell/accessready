@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Text drawn over text at 200%</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  button, input { font: inherit; padding: 8px 12px; }
+  img { max-width: 100%; height: auto; }
+  /* The subtitle is placed a fixed distance below the title: once the title wraps at 200% zoom, they collide. */
+  .stage { position: relative; height: 140px; }
+  .title { position: absolute; top: 0; left: 0; width: 70%; margin: 0; font-size: 28px; line-height: 1.3; }
+  .subtitle { position: absolute; top: 48px; left: 0; margin: 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Text drawn over text at 200%</h1>
+  <div class="stage">
+    <p id="title" class="title">Annual report on food security in our county</p>
+    <p id="subtitle" class="subtitle">Published in March by the volunteers</p>
+  </div>
+</main>
+
+</body>
+</html>

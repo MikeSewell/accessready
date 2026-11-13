@@ -64,14 +64,16 @@ async function open(page, url, timeout) {
   return res;
 }
 
-async function newContext(browser, viewport, opts) {
+// Pages are audited with reduced motion asked for, so animations hold still for screenshots.
+// A check about motion itself can ask for 'no-preference', which is what most visitors have.
+async function newContext(browser, viewport, opts, reducedMotion = 'reduce') {
   const { name, isMobile, hasTouch, ...size } = viewport;
   const context = await browser.newContext({
     viewport: size,
     // Firefox has no mobile emulation; it still renders at phone width.
     ...(isMobile && engineOf(browser) !== 'firefox' ? { isMobile: true } : {}),
     ...(hasTouch ? { hasTouch: true } : {}),
-    reducedMotion: 'reduce',
+    reducedMotion,
     ...(opts.storageState ? { storageState: opts.storageState } : {}),
   });
   await context.addInitScript(instrument);
@@ -134,8 +136,9 @@ async function auditPage(browser, url, viewport, opts) {
 
     // A fresh copy of the page for a check that changes things. `clock` gives it a clock the
     // check can move forward, to see what the page does after minutes have passed.
-    const fresh = async ({ clock = false } = {}) => {
-      const ctx = await newContext(browser, viewport, opts);
+    // `reducedMotion: 'no-preference'` loads it the way a visitor without that setting sees it.
+    const fresh = async ({ clock = false, reducedMotion } = {}) => {
+      const ctx = await newContext(browser, viewport, opts, reducedMotion);
       extraContexts.push(ctx);
       const p = await ctx.newPage();
       if (clock) await p.clock.install();
@@ -148,7 +151,7 @@ async function auditPage(browser, url, viewport, opts) {
       for (const probe of probes(phase)) {
         if (probe.isolated || probe.clock) {
           let p;
-          try { p = await fresh({ clock: !!probe.clock }); } catch (e) {
+          try { p = await fresh({ clock: !!probe.clock, reducedMotion: probe.reducedMotion }); } catch (e) {
             result.notes.push(`the ${probe.name} check could not open the page again: ${String(e.message).split('\n')[0]}`);
             continue;
           }
@@ -166,7 +169,7 @@ async function auditPage(browser, url, viewport, opts) {
     result.review = await takeInventory(page);
     await runPhase('look');
 
-    const contrast = await measureContrastOnImages(page, axe.unmeasuredContrast);
+    const contrast = await measureContrastOnImages(page, axe.unmeasuredContrast, { level: opts.level });
     // What is left for a person after measuring: axe's other undecided rules, plus the text
     // whose background passes in some places and fails in others.
     result.needsReview = axe.needsReview

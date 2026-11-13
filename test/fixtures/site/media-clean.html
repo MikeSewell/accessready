@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Media done right</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  button { font: inherit; padding: 8px 12px; }
+  section { margin-bottom: 24px; }
+  video, audio { max-width: 100%; height: auto; }
+  :focus-visible { outline: 3px solid #0b4a8f; outline-offset: 2px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Media done right</h1>
+  <section>
+    <h2>Episode 12: Volunteers</h2>
+    <audio id="episode" src="sound.webm" controls></audio>
+    <p><a href="clean.html">Read the transcript of episode 12</a></p>
+  </section>
+  <section>
+    <h2>Our year</h2>
+    <video id="year" src="sound.webm" width="320" height="180" controls preload="auto">
+      <track kind="captions" src="captions.vtt" srclang="en" label="English">
+      <track kind="descriptions" src="captions.vtt" srclang="en" label="Audio description">
+    </video>
+    <p><a href="clean.html">Transcript</a> and <a href="clean.html">sign language (ASL) version</a>.</p>
+  </section>
+  <section>
+    <h2>How to pack a box</h2>
+    <video id="silent" src="clip.webm" width="320" height="180" controls preload="auto"></video>
+    <p>The video shows two volunteers folding a box and filling it with tins. <a href="clean.html">Text version</a>.</p>
+  </section>
+  <section>
+    <h2>Behind the scenes</h2>
+    <video id="loop" src="clip.webm" width="320" height="180" autoplay muted loop playsinline></video>
+    <p><button type="button" onclick="document.getElementById(&quot;loop&quot;).pause()">Pause video</button></p>
+  </section>
+</main>
+
+</body>
+</html>

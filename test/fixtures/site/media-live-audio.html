@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live audio</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  button { font: inherit; padding: 8px 12px; }
+  section { margin-bottom: 24px; }
+  video, audio { max-width: 100%; height: auto; }
+  :focus-visible { outline: 3px solid #0b4a8f; outline-offset: 2px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Live audio</h1>
+  <section>
+    <h2>Community radio, live</h2>
+    <audio id="radio" controls></audio>
+  </section>
+</main>
+<script>
+  // A live audio stream with no end: a silent oscillator through a stream.
+  const ac = new AudioContext(), osc = ac.createOscillator(), gain = ac.createGain(), out = ac.createMediaStreamDestination();
+  gain.gain.value = 0;
+  osc.connect(gain).connect(out);
+  osc.start();
+  const radio = document.getElementById("radio");
+  radio.srcObject = out.stream;
+  radio.play().catch(() => {});
+</script>
+</body>
+</html>

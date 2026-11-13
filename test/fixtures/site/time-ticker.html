@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ticker</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  button { font: inherit; padding: 8px 12px; }
+
+</style>
+</head>
+<body>
+<main>
+  <h1>Ticker</h1>
+  <p>Latest: <span id="ticker">Doors open at nine</span></p>
+</main>
+<script>
+  // Swaps the headline every three seconds, forever.
+  const lines = ["Doors open at nine", "Volunteers needed on Saturday", "New pantry hours from June", "Thank you to our donors"];
+  let n = 0;
+  setInterval(() => { document.getElementById("ticker").textContent = lines[++n % lines.length]; }, 3000);
+</script>
+</body>
+</html>

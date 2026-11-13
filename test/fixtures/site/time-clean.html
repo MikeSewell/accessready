@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Moving things done right</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  button { font: inherit; padding: 8px 12px; }
+  .slide { display: none; } .slide.active { display: block; }
+  .card { display: inline-block; width: 240px; height: 120px; padding: 16px; background: #e3ecf7; transition: transform 0.4s; }
+  .card:hover { transform: translateY(-40px); }
+  @media (prefers-reduced-motion: reduce) { .card { transition: none; } }
+  .pulse { display: inline-block; animation: pulse 1s ease-in-out 3; }
+  @keyframes pulse { 50% { transform: scale(1.2); } }
+  .spinner { width: 24px; height: 24px; border: 3px solid #555; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Moving things done right</h1>
+  <section id="news" aria-roledescription="carousel" aria-label="News">
+    <div class="slides">
+      <div class="slide active"><h2>Food drive this Saturday</h2><p>Bring tins and dry goods to the community center.</p></div>
+      <div class="slide"><h2>New volunteers welcome</h2><p>Training sessions run every Tuesday evening.</p></div>
+      <div class="slide"><h2>Thank you to our donors</h2><p>Last year you helped us serve 12,000 meals.</p></div>
+    </div>
+    <p><button type="button" id="prev">Previous slide</button> <button type="button" id="next">Next slide</button> <button type="button" id="pause">Pause slides</button></p>
+  </section>
+  <p><a class="card" href="clean.html">Our programs</a></p>
+  <p><span class="pulse">New</span> A short animation that ends.</p>
+  <p class="spinner" role="progressbar" aria-label="Loading"></p>
+</main>
+<script>
+  // Rotates every four seconds by itself.
+  const slides = [...document.querySelectorAll(".slide")];
+  let at = 0, timer = null;
+  // This one also writes the slide number into the address, which is not leaving the page.
+  const show = (i) => { slides[at].classList.remove("active"); at = (i + slides.length) % slides.length; slides[at].classList.add("active"); history.replaceState(null, "", "#slide-" + (at + 1)); };
+  const start = () => { timer = setInterval(() => show(at + 1), 4000); };
+  document.getElementById("prev").addEventListener("click", () => show(at - 1));
+  document.getElementById("next").addEventListener("click", () => show(at + 1));
+  const pause = document.getElementById("pause");
+  if (pause) pause.addEventListener("click", () => { if (timer) { clearInterval(timer); timer = null; pause.textContent = "Play slides"; } else { start(); pause.textContent = "Pause slides"; } });
+  start();
+</script>
+</body>
+</html>
