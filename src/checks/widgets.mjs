@@ -468,24 +468,34 @@ async function pressLetters(_page, ctx) {
     await page.evaluate(startWatch);
     await page.waitForTimeout(400);
     const quiet = (await page.evaluate(readWatch)).mutations === 0;
-    const found = [];
-    for (const key of SHORTCUT_KEYS) {
+    // One try: press `key` (or nothing, for a control try) and name what changed, if anything.
+    const trial = async (key) => {
       await reset();
       await page.waitForTimeout(50);
       await page.evaluate(startWatch);
       const navs = g.attempts.length, wins = g.popups.length;
-      await page.keyboard.press(key);
+      if (key) await page.keyboard.press(key);
       await page.waitForTimeout(250);
       const w = await page.evaluate(readWatch);
       const focus = await page.evaluate(() => { const a = document.activeElement; return a && a !== document.body ? `${a.tagName.toLowerCase()}${(a.getAttribute('aria-label') || a.getAttribute('placeholder') || a.labels?.[0]?.textContent || '').trim() ? ` "${(a.getAttribute('aria-label') || a.getAttribute('placeholder') || a.labels?.[0]?.textContent || '').trim().slice(0, 40)}"` : ''}` : null; });
-      const effect = g.attempts.slice(navs).some((a) => a.navigation) ? 'loads another page'
+      return g.attempts.slice(navs).some((a) => a.navigation) ? 'loads another page'
         : g.popups.length > wins || w.opened ? 'opens a new window'
         : w.dialogs.length ? `opens "${w.dialogs[0]}"`
         : focus ? `moves focus to ${focus}`
         : w.scrolled ? 'scrolls the page'
         : quiet && w.mutations > 0 ? 'changes the page'
         : null;
-      if (effect) found.push(`"${key}" ${effect}`);
+    };
+    const found = [];
+    for (const key of SHORTCUT_KEYS) {
+      const effect = await trial(key);
+      if (!effect) continue;
+      // A page that animates or scrolls by itself can change at the moment a key is pressed.
+      // Count a key only when pressing it again does the same, and two tries with no key
+      // pressed do not.
+      if (await trial(key) !== effect) continue;
+      if (await trial(null) === effect || await trial(null) === effect) continue;
+      found.push(`"${key}" ${effect}`);
       if (found.length >= 3) break;
     }
     await g.stop();

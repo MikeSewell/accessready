@@ -530,7 +530,11 @@ async function attemptForms(page, ctx) {
       await copy.keyboard.press('Enter').catch(() => {});
     }
     await copy.waitForTimeout(SETTLE);
-    const look = () => inPage(copy, judge, { i: form.index, props: STYLE_PROPS, colorProps: COLOR_PROPS, filled, realSubmit: form.realSubmit }).catch(() => ({ gone: true }));
+    // Reading the page can fail for a moment while a script is still swapping content or a
+    // busy machine is slow to answer; one more try after a pause tells that from a page that
+    // really went away.
+    const read = () => inPage(copy, judge, { i: form.index, props: STYLE_PROPS, colorProps: COLOR_PROPS, filled, realSubmit: form.realSubmit });
+    const look = () => read().catch(async () => { await copy.waitForTimeout(SETTLE); return read().catch(() => ({ gone: true })); });
     let r = await look();
     // Before calling a form silent, give a slow message (a fade, a check that waits) more time.
     const quiet = (x) => !x.gone && !x.nativeBlocked && x.problems.length && !x.texts.length && !dialogs.length && x.problems.every((p) => p.style === 'none' && !p.near);

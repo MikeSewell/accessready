@@ -1,6 +1,6 @@
 # accessready
 
-> WCAG 2.2 AA audit for a whole site. Runs axe-core, then uses every page the way a keyboard user does, in real Chrome, to catch what rule engines miss.
+> WCAG 2.2 audit for a whole site, levels A to AAA, on a phone and a desktop screen. Runs axe-core, then uses every page the way people with disabilities do, to catch what rule engines miss.
 
 [![npm](https://img.shields.io/npm/v/accessready.svg)](https://www.npmjs.com/package/accessready)
 [![CI](https://github.com/MikeSewell/accessready/actions/workflows/ci.yml/badge.svg)](https://github.com/MikeSewell/accessready/actions/workflows/ci.yml)
@@ -12,7 +12,7 @@ npx accessready https://example.org
 
 ![accessready reporting a link with no focus indicator, a hover-only menu, a keyboard trap and text too faint over an image](https://raw.githubusercontent.com/MikeSewell/accessready/main/docs/terminal.png)
 
-It reads the sitemap, audits every page, and exits 1 if anything fails, so it can gate a deploy.
+It reads the sitemap, audits every page on a phone and a desktop screen, and exits 1 if anything fails, so it can gate a deploy. It also reads the results against ADA Title II, Section 508, EN 301 549 and AODA.
 
 ## Why
 
@@ -36,6 +36,17 @@ But many of the problems that lock people out can't be decided from code. You ha
 | Compares header and footer links, search and help across pages | A contact link renamed on one page, or help that moves | 3.2.4, 3.2.6 |
 | Looks for search, a site map page or related links besides the menu | A site you can only get around by its menu | 2.4.5 |
 | Downloads every linked PDF and reads it | A scanned or untagged PDF, or one with no title or language | 1.1.1, 1.3.1, 2.4.2, 3.1.1 |
+| Measures each focus indicator against what was there before | A focus ring too faint or too thin to see | 1.4.11, 2.4.13 |
+| Tries each form with mistakes, on a copy that cannot reach your server | Errors shown only in red, or not at all, or that say "invalid" and nothing else | 3.3.1, 3.3.3, 1.4.1 |
+| Moves the clock forward 20 minutes on a copy of the page | A session that expires without warning, a popup that interrupts, a carousel that never stops | 2.2.1, 2.2.2, 2.2.4 |
+| Records the screen for three seconds and counts flashes | Content that flashes fast enough to trigger seizures | 2.3.1 |
+| Zooms to 200% and turns a phone sideways | Text that does not grow or gets cut off, a page locked to one orientation | 1.4.4, 1.3.4 |
+| Reads the text inside images | A banner whose words are a picture | 1.4.5 |
+| Checks every video and audio player, YouTube and Vimeo included | Video with no captions, no transcript or no audio description | 1.2.1 to 1.2.5 |
+| Watches which elements listen for touch, drag and motion | A carousel you can only swipe, a slider you can only drag | 2.5.1, 2.5.7 |
+| Opens tooltips, tabs, switches and dialogs, then checks their state | A tab that changes on screen but not for a screen reader, a tooltip Escape cannot close | 4.1.2, 1.4.13 |
+| Presses single letter keys with nothing focused | A shortcut that fires when a voice-control user says a word | 2.1.4 |
+| Detects the language of the text | Spanish text marked as English | 3.1.1, 3.1.2 |
 
 As of axe-core 4.14, it has no rule for focus visibility, hidden focus, keyboard traps, hover-only menus, reflow or navigation order, and it hands text over images back as "needs review".
 
@@ -51,6 +62,8 @@ As of axe-core 4.14, it has no rule for focus visibility, hidden focus, keyboard
 | By hand | 0 | 0 | 1 | 1 |
 <!-- coverage:end -->
 
+Every A and AA criterion has at least one automated check. Where a check cannot be sure, it reports a likely problem for a person to confirm instead of guessing. `--level AAA` adds the AAA criteria.
+
 Every criterion, what is tested and what is left to a person: [docs/COVERAGE.md](https://github.com/MikeSewell/accessready/blob/main/docs/COVERAGE.md). The table is generated from the code and checked on every commit.
 
 For the part no tool can judge, the HTML report gives you a worklist instead of a warning: every image with its description beside it, every video, every form, every "click here" link, and each page's heading outline.
@@ -59,9 +72,14 @@ For the part no tool can judge, the HTML report gives you a worklist instead of 
 
 - **A pass is not conformance.** Automated checks find some accessibility problems, not all of them. Deque, who make axe-core, put their own coverage at [57% of issues by volume](https://www.deque.com/blog/automated-testing-study-identifies-57-percent-of-digital-accessibility-issues). When the UK government ran ten tools against a page of planted barriers, [all of them together found 71%](https://accessibility.blog.gov.uk/2017/02/24/what-we-found-when-we-tested-tools-on-the-worlds-least-accessible-webpage/). You still need a person with a keyboard and a screen reader.
 - **It is not a legal opinion.** It won't tell you a site is "ADA compliant", and neither will any other tool.
-- **It only drives Chrome.** No Firefox or Safari.
-- **It doesn't use your site like a visitor with a goal.** It opens menus and presses buttons that say they expand something, but it never submits a form, logs in or steps through a checkout.
+- **It drives Chrome unless told otherwise.** `--browser firefox`, `webkit` or `all` adds Firefox and WebKit, the engine inside Safari, from Playwright's own builds. It does not drive the Safari app itself.
+- **It doesn't use your site like a visitor with a goal.** It never lets a form reach your server, logs in or steps through a checkout, so what happens after a real submission is left to a person.
+- **It takes time.** Each page is audited twice, on a phone and a desktop screen, and some checks open fresh copies of the page. Use `--viewports desktop` or `--max` for a quicker pass.
 - If you only need rule checks on a handful of URLs, [`@axe-core/cli`](https://github.com/dequelabs/axe-core-npm/tree/develop/packages/cli) or [`pa11y-ci`](https://github.com/pa11y/pa11y-ci) are smaller.
+
+## Similar projects
+
+Other open source tools use the page as accessready does, each on part of it: [A11y Pulse audits](https://github.com/A11y-Pulse/audits) (focus, keyboard traps, reflow, text spacing, one page at a time), [Sightline](https://github.com/Ax1zz/sightline) (the WCAG 2.2 criteria axe-core cannot test), [SpecA11y](https://github.com/OKlueck/SpecA11y) (interaction rules on Playwright, with an optional AI pass), [Out of Order](https://github.com/spaansba/out-of-order) (tab order, with an overlay and a test matcher) and the New Zealand government's [CWAC](https://github.com/GOVTNZ/cwac) (scanning many sites). [Unlighthouse](https://github.com/harlan-zw/unlighthouse) runs Lighthouse across a whole site. accessready puts the rule engine, the keyboard walk and the interaction checks in one command over a whole site, writes a report a site owner can read, and publishes what it covers criterion by criterion.
 
 ## Install
 
@@ -110,13 +128,16 @@ When you point it at localhost, URLs in the sitemap are rewritten onto localhost
 | `--max <n>` | 40 | Most pages to audit from a sitemap |
 | `--concurrency <n>` | 2 | Pages audited at once |
 | `--storage-state <file>` | | Playwright storage state, to audit logged-in pages |
-| `--viewport <WxH>` | 1440x900 | Browser window size. Try `390x844` for a phone |
+| `--level <A\|AA\|AAA>` | AA | WCAG level to check against |
+| `--viewports <list>` | desktop,phone | Screen sizes: `desktop` (1440x900), `phone` (390x844, touch), or `WIDTHxHEIGHT`, comma separated |
+| `--viewport <WxH>` | | One screen size only |
 | `--max-tab-stops <n>` | 150 | Most Tab presses per page |
 | `--timeout <ms>` | 45000 | Page load timeout |
-| `--browser <name>` | auto | `auto`, `chrome` or `chromium` |
+| `--browser <list>` | auto | `auto` (installed Chrome, else Playwright's Chromium), `chrome`, `chromium`, `firefox`, `webkit`, or `all`; comma separated |
 | `--proxy <url>` | | Send browser traffic through a proxy |
 | `--no-dismiss` | | Leave cookie banners alone instead of clicking Reject |
-| `--strict` | | Also fail on best-practice notes |
+| `--strict` | | Also fail on likely problems and best-practice notes |
+| `--ai <provider[:model]>` | | Add the AI review; see below |
 | `--no-color` | | Plain output. `NO_COLOR` works too |
 
 ### Exit codes
@@ -158,9 +179,11 @@ accessready https://staging.example.org --baseline accessready-baseline.json
 
 The second run reports how many known findings it skipped, lists the new ones and the ones fixed since the baseline, and exits 1 only for new failures. Findings are matched by rule, page path, element and message with numbers taken out, so a contrast ratio that moves from 4.31:1 to 4.29:1, or a different host, does not count as new. Commit the baseline and refresh it with `--update-baseline` as problems get fixed.
 
-### Failures and notes
+### Failures, likely problems and notes
 
-A **failure** is a WCAG 2.2 A or AA problem the tool is sure of. A **note** is either recognized good practice that WCAG doesn't require (heading levels that skip), or something that needs a person to confirm (an element with a pointer cursor that Tab never reaches). Notes are printed but only fail the run with `--strict`.
+A **failure** is a WCAG problem the tool is sure of. A **likely problem** is strong evidence of one that a person should confirm, because the criterion has an exception a machine cannot see: a logo is allowed to be an image of text, a timed step can be essential. A **note** is recognized good practice that WCAG doesn't require (heading levels that skip). Failures fail the run; likely problems and notes do only with `--strict`.
+
+A finding seen on only one screen size or browser says so, for example "phone only".
 
 axe-core also returns items it could not judge. Where that is text over an image, accessready measures it: if it fails everywhere it becomes a failure, if it passes everywhere it is dropped, and if it is mixed it goes on the report's worklist with the measured range.
 
@@ -250,6 +273,34 @@ accessready https://app.example.org /dashboard /settings --storage-state auth.js
 
 The same trick gets a timed popup out of the way: dismiss it during `codegen` and, if the site remembers that in a cookie or local storage, the saved state carries it over. If a popup does open partway through an audit and covers the page, accessready says so and stops walking that page rather than reporting everything behind the popup as hidden.
 
+## AI review
+
+Some of WCAG is about meaning: does an image description say what the image is for, does a link say where it goes, does an instruction rely on color? `--ai` asks a model you choose to judge these, on top of the automated checks.
+
+Use a coding agent you already pay for, with the account it is logged in to and no key to set:
+
+```sh
+npx accessready https://example.org --ai claude-code        # Claude Code
+npx accessready https://example.org --ai codex              # OpenAI Codex
+npx accessready https://example.org --ai gemini-cli         # Gemini CLI, text only
+npx accessready https://example.org --ai qwen-code          # Qwen Code, text only
+```
+
+Or an API with your own key (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, or `ACCESSREADY_AI_KEY` for any), or a model on your own machine:
+
+```sh
+npx accessready https://example.org --ai anthropic:<model>
+npx accessready https://example.org --ai openai:<model>
+npx accessready https://example.org --ai gemini:<model>
+npx accessready https://example.org --ai ollama:<model>     # or lmstudio:<model>
+```
+
+Add `:<model>` to a coding agent to pick its model, for example `--ai claude-code:opus`. Its findings are likely problems for a person to confirm, marked as AI judgments with the model's reason; they never fail a run unless `--strict` is set. Before the first request it prints what will be sent and to whom. Each page is one request; answers are kept in `.accessready-cache/ai`, so a rerun on unchanged pages sends nothing, and `--ai-max-requests` (default 50) caps a run.
+
+The coding agents run headless, in an empty temporary folder that is deleted afterwards, with their file and command tools turned off where the CLI allows. Claude Code runs with no tools at all. Codex runs in its read-only sandbox with its shell turned off; a page could still in principle ask it to read a file on your machine, so use another provider on sites you do not trust.
+
+**Privacy:** each page's text, links, headings, form labels and images (scaled down) go to the provider you name, or through the CLI you name to its service. Use a local model for pages whose content must not leave your machine.
+
 ## As a library
 
 ```js
@@ -263,6 +314,8 @@ process.exitCode = exitCode(result);
 ## What it does to your pages
 
 accessready only does what a visitor could do. It clicks Reject on a cookie banner, presses Tab, hovers menus, and presses Enter on buttons marked `aria-expanded="false"`, closing each one again. It never presses Enter on a link. If a button navigates away anyway, it stops operating that page and says so.
+
+Some checks work on a fresh copy of the page, thrown away afterwards, so nothing they do touches the copy that is being walked: they move the page's clock forward 20 minutes, resize the window and zoom, turn a phone sideways, press single letter keys and arrow keys, hover tooltips and press Escape, press a mouse button without releasing it, simulate tilting a phone, press Play on a YouTube player to read its captions, change a dropdown, radio button or checkbox (never in a login or payment form, and with every request blocked), and cancel any alert or confirm box the page opens. At level AAA it also scrolls and hovers to look for motion.
 
 To see how forms handle mistakes, it opens a separate copy of the page that cannot reach your server. While the copy loads, only GET and HEAD requests go out and service workers are off. Once the form test starts, every request, navigation and WebSocket message is stopped inside the browser and only recorded. In that copy it leaves required fields empty, types obvious nonsense such as `not-an-email` into typed fields, presses the submit button and reads what the page shows. It never types anything that looks like real data, tries at most three forms per page, and throws the copy away afterwards. If a form tries to send anyway, the report says so.
 
@@ -286,7 +339,14 @@ node bin/accessready.mjs http://127.0.0.1:4173 /focus.html /menu.html /trap.html
 
 ## What the law says
 
-accessready checks against WCAG 2.2 AA, which includes everything in 2.1 AA.
+accessready checks against WCAG 2.2, AA unless `--level` says otherwise. The HTML report also reads the findings against the standards built on WCAG:
+
+| Standard | What it requires of a website |
+|---|---|
+| ADA Title II (US state and local government) | WCAG 2.1 AA, for web content and documents such as PDFs |
+| Section 508 (US federal) | WCAG 2.0 AA, plus player controls for captions and audio description (503.4) |
+| EN 301 549 (EU, the European Accessibility Act) | WCAG 2.1 AA (clause 9), caption and audio description controls (clause 7), documents (clause 10) |
+| AODA (Ontario) | WCAG 2.0 AA, except live captions and prerecorded audio description |
 
 In the US, WCAG 2.1 AA is the technical standard for state and local government websites under the Department of Justice's [ADA Title II rule](https://www.ada.gov/resources/2024-03-08-web-rule/). For businesses and nonprofits there is no regulation naming a WCAG version; the Department's [web guidance](https://www.ada.gov/resources/web-guidance/) says it "does not have a regulation setting out detailed standards" and names WCAG among the existing standards that "provide helpful guidance".
 

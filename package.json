@@ -1,6 +1,6 @@
 {
   "name": "accessready",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "WCAG 2.2 AA audit for a whole site. Runs axe-core, then uses every page the way a keyboard user does, in real Chrome, to catch what rule engines miss.",
   "type": "module",
   "bin": {

@@ -15,6 +15,7 @@ before(async () => {
   site = await startSite();
   runs.consistent = await set('home', 'about', 'contact');
   runs.problems = await set('home', 'renamed', 'moved');
+  runs.anchors = await set('anchors', 'anchors-b');
   runs.menuOnly = await set('plain-1', 'plain-2');
   runs.siteMap = await set('plain-1', 'sitemap');
   runs.steps = await set('step-1', 'step-2');
@@ -25,6 +26,13 @@ after(() => site.close());
 
 test('pages with the same menu, search and help in the same places report nothing', () => {
   assert.deepEqual(found(runs.consistent), [['/site-home.html', []], ['/site-about.html', []], ['/site-contact.html', []]]);
+});
+
+test('links to a part of a page, and "#" controls, are not names for that page', () => {
+  // site-anchors.html's footer links to site-home.html#work ("Our work") and has "#" and "#top"
+  // links; site-anchors-b.html's footer calls site-home.html "Home" and site-anchors.html
+  // "Programs". None of the anchors is another name for those pages.
+  assert.deepEqual(found(runs.anchors).map(([p, f]) => [p, f.filter((x) => x.endsWith('inconsistent-identification'))]), [['/site-anchors.html', []], ['/site-anchors-b.html', []]]);
 });
 
 test('a renamed footer link and search button are likely problems; moved help fails', () => {

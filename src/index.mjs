@@ -31,6 +31,9 @@ export const VIEWPORTS = {
 
 export const BROWSERS = ['chrome', 'chromium', 'firefox', 'webkit'];
 
+// Checks that work on their own copy of a page and may run at the same time.
+const ISOLATED_AT_ONCE = 2;
+
 // Installed Chrome first: nothing to download, and it is what most visitors use. Then the
 // Chromium that `npx playwright install chromium` provides. Firefox and WebKit (the engine
 // inside Safari) come from Playwright's own builds: `npx playwright install firefox webkit`.
@@ -72,13 +75,13 @@ async function open(page, url, timeout) {
 async function newContext(browser, viewport, opts, { reducedMotion = 'reduce', ...extra } = {}) {
   const { name, isMobile, hasTouch, ...size } = viewport;
   const context = await browser.newContext({
-    ...extra,
     viewport: size,
     // Firefox has no mobile emulation; it still renders at phone width.
     ...(isMobile && engineOf(browser) !== 'firefox' ? { isMobile: true } : {}),
     ...(hasTouch ? { hasTouch: true } : {}),
     reducedMotion,
     ...(opts.storageState ? { storageState: opts.storageState } : {}),
+    ...extra,
   });
   await context.addInitScript(instrument);
   return context;
@@ -102,30 +105,43 @@ async function loadPage(page, url, opts) {
   return { res, dismissed };
 }
 
+// How long each step took on each page, in milliseconds, kept in the JSON output so a slow
+// check can be found on a real site.
+async function timed(result, name, fn) {
+  const start = Date.now();
+  try { return await fn(); } finally { result.timings[name] = (result.timings[name] || 0) + Date.now() - start; }
+}
+
+// Runs one check and returns what it found, { issues, notes }, so checks that run at the same
+// time can still be added to the result in a fixed order.
 async function runProbe(probe, page, ctx, result) {
+  const start = Date.now();
   try {
     const out = await probe.run(page, ctx);
-    const issues = Array.isArray(out) ? out : out?.issues || [];
-    result.issues.push(...issues);
-    if (out?.notes) result.notes.push(...out.notes);
+    return { issues: Array.isArray(out) ? out : out?.issues || [], notes: out?.notes || [] };
   } catch (e) {
-    result.notes.push(`the ${probe.name} check could not finish: ${String(e.message).split('\n')[0]}`);
+    return { issues: [], notes: [`the ${probe.name} check could not finish: ${String(e.message).split('\n')[0]}`], crashed: /Target crashed|Target page, context or browser has been closed/i.test(String(e.message)) };
+  } finally {
+    result.timings[probe.name] = (result.timings[probe.name] || 0) + Date.now() - start;
   }
 }
 
 async function auditPage(browser, url, viewport, opts) {
   const engine = engineOf(browser);
   const context = await newContext(browser, viewport, opts);
+  // Cookies from pages already audited, the way a visitor's browser carries them from page to
+  // page: a host's bot check passed on the first page is not met again on every other.
+  if (opts.jar?.cookies.length) await context.addCookies(opts.jar.cookies).catch(() => {});
   const page = await context.newPage();
   const result = {
     url, viewport: viewport.name, browser: engine, status: null, error: null,
-    issues: [], needsReview: [], review: null, tabStops: 0, notes: [],
+    issues: [], needsReview: [], review: null, tabStops: 0, notes: [], timings: {},
   };
   const extraContexts = [];
   try {
     let loaded;
     try {
-      loaded = await loadPage(page, url, opts);
+      loaded = await timed(result, 'load', () => loadPage(page, url, opts));
     } catch (e) {
       result.error = `could not load: ${String(e.message).split('\n')[0]}`;
       return result;
@@ -137,6 +153,13 @@ async function auditPage(browser, url, viewport, opts) {
       return result;
     }
     if (dismissed) result.notes.push(`clicked "${dismissed}" on a cookie banner first`);
+    // Fresh copies start with the cookies the first load ended with. A host's bot check that
+    // was passed once is not met again (msewell.com's host answers each new session with a
+    // 403 first, which cost six seconds per copy), and a cookie banner already declined stays
+    // declined. Local storage is not carried over, and the clock check starts as a brand-new
+    // visitor: popups shown only on a first visit are what it looks for.
+    const cookies = await context.cookies().catch(() => []);
+    if (opts.jar && cookies.length) opts.jar.cookies = cookies;
 
     // A fresh copy of the page for a check that changes things. `clock` gives it a clock the
     // check can move forward, to see what the page does after minutes have passed.
@@ -146,6 +169,7 @@ async function auditPage(browser, url, viewport, opts) {
     // `reducedMotion: 'no-preference'` loads it the way a visitor without that setting sees it.
     const fresh = async ({ clock = false, prepare = null, serviceWorkers = 'allow', reducedMotion } = {}) => {
       const ctx = await newContext(browser, viewport, opts, { serviceWorkers, reducedMotion });
+      if (!clock && cookies.length) await ctx.addCookies(cookies).catch(() => {});
       extraContexts.push(ctx);
       if (prepare) await prepare(ctx);
       const p = await ctx.newPage();
@@ -155,43 +179,67 @@ async function auditPage(browser, url, viewport, opts) {
     };
     const probeCtx = { url, level: opts.level, viewport, browserName: engine, opts, result, fresh };
     const probes = (phase) => PROBES.filter((p) => p.phase === phase && (!p.browsers || p.browsers.includes(engine)));
+    // Checks on the page itself run one after another. Checks that get their own copy cannot
+    // affect each other, so up to ISOLATED_AT_ONCE of them run at the same time; their findings
+    // are still added in the order the checks are listed.
     const runPhase = async (phase) => {
-      for (const probe of probes(phase)) {
-        if (probe.isolated || probe.clock) {
+      const list = probes(phase);
+      const outputs = new Array(list.length);
+      const isolated = list.map((probe, i) => ({ probe, i })).filter(({ probe }) => probe.isolated || probe.clock);
+      let next = 0;
+      const worker = async () => {
+        for (let k = next++; k < isolated.length; k = next++) {
+          const { probe, i } = isolated[k];
           let p;
-          try { p = await fresh({ clock: !!probe.clock, reducedMotion: probe.reducedMotion }); } catch (e) {
-            result.notes.push(`the ${probe.name} check could not open the page again: ${String(e.message).split('\n')[0]}`);
+          try { p = await timed(result, probe.name, () => fresh({ clock: !!probe.clock, reducedMotion: probe.reducedMotion })); } catch (e) {
+            outputs[i] = { issues: [], notes: [`the ${probe.name} check could not open the page again: ${String(e.message).split('\n')[0]}`] };
             continue;
           }
-          await runProbe(probe, p, probeCtx, result);
-        } else {
-          await runProbe(probe, page, probeCtx, result);
+          outputs[i] = await runProbe(probe, p, probeCtx, result);
+          await p.context().close().catch(() => {});
+          // A renderer that crashed under load takes its page with it. Try once more on a new copy.
+          if (outputs[i].crashed) {
+            const again = await timed(result, probe.name, () => fresh({ clock: !!probe.clock, reducedMotion: probe.reducedMotion })).catch(() => null);
+            if (again) {
+              outputs[i] = await runProbe(probe, again, probeCtx, result);
+              await again.context().close().catch(() => {});
+            }
+          }
         }
+      };
+      const running = Promise.all(Array.from({ length: Math.min(ISOLATED_AT_ONCE, isolated.length) }, worker));
+      for (const [i, probe] of list.entries()) {
+        if (!(probe.isolated || probe.clock)) outputs[i] = await runProbe(probe, page, probeCtx, result);
+      }
+      await running;
+      for (const out of outputs) {
+        result.issues.push(...out.issues);
+        result.notes.push(...out.notes);
       }
     };
 
     // Order matters. First everything that only looks at the page, then what measures it,
     // then the keyboard walk, then the checks that operate or resize it.
-    const axe = await runAxe(page, opts.level);
+    const axe = await timed(result, 'axe', () => runAxe(page, opts.level));
     result.engine = axe.engine;
-    result.review = await takeInventory(page);
+    result.review = await timed(result, 'inventory', () => takeInventory(page));
     await runPhase('look');
 
-    const contrast = await measureContrastOnImages(page, axe.unmeasuredContrast, { level: opts.level });
+    const contrast = await timed(result, 'contrast-on-image', () => measureContrastOnImages(page, axe.unmeasuredContrast, { level: opts.level }));
     // What is left for a person after measuring: axe's other undecided rules, plus the text
     // whose background passes in some places and fails in others.
     result.needsReview = axe.needsReview
       .map((r) => (r.id === 'color-contrast' ? { ...r, count: r.count - contrast.resolved - contrast.issues.length } : r))
       .filter((r) => r.count > 0);
     result.review.contrast = contrast.unresolved;
-    const video = await checkMovingVideo(page);
-    const unreachable = await checkUnreachable(page);
-    const spacing = await checkTextSpacing(page);
+    const video = await timed(result, 'moving-video', () => checkMovingVideo(page));
+    const unreachable = await timed(result, 'unreachable', () => checkUnreachable(page));
+    const spacing = await timed(result, 'text-spacing', () => checkTextSpacing(page));
     result.issues.push(...axe.issues, ...contrast.issues, ...video, ...unreachable, ...spacing);
     await runPhase('measure');
 
     // `fresh` lets the walk confirm, in a copy of the page, what it saw happen on focus.
-    const keyboard = await walkKeyboard(page, { maxStops: opts.maxTabStops, level: opts.level, fresh });
+    const keyboard = await timed(result, 'keyboard-walk', () => walkKeyboard(page, { maxStops: opts.maxTabStops, level: opts.level, fresh }));
     result.tabStops = keyboard.stops;
     result.issues.push(...keyboard.issues);
     result.notes.push(...(keyboard.notes || []));
@@ -201,14 +249,14 @@ async function auditPage(browser, url, viewport, opts) {
 
     // A popup that has taken over the page would make these report on the popup, not the page.
     if (!keyboard.dialogsOpened.length) {
-      result.issues.push(...await checkHoverMenus(page));
-      const toggles = await checkDisclosures(page);
+      result.issues.push(...await timed(result, 'hover-menus', () => checkHoverMenus(page)));
+      const toggles = await timed(result, 'disclosures', () => checkDisclosures(page));
       result.issues.push(...toggles.issues);
       result.notes.push(...toggles.notes);
     }
     // Reflow is defined at 320 CSS pixels on a desktop browser zoomed to 400%. A phone
     // emulation lays a page out differently, so it is measured from desktop windows only.
-    if (!viewport.isMobile) result.issues.push(...await checkReflow(page));
+    if (!viewport.isMobile) result.issues.push(...await timed(result, 'reflow', () => checkReflow(page)));
     await runPhase('operate');
 
     // Only what belongs to the level asked for. Findings tied to no criterion (best practice,
@@ -255,7 +303,7 @@ function mergeViews(audits) {
       issues: [...issues.values()].map((i) => ({ ...i, seenOn: i.seenOn.length === everywhere.length ? null : i.seenOn })),
       needsReview: first.needsReview, review, tabStops: first.tabStops,
       notes: [...notes].map(([n, on]) => (on.length === everywhere.length ? n : `${n} (${on.join(', ')})`)),
-      views: views.map((v) => ({ viewport: v.viewport, browser: v.browser, tabStops: v.tabStops, error: v.error })),
+      views: views.map((v) => ({ viewport: v.viewport, browser: v.browser, tabStops: v.tabStops, error: v.error, timings: v.timings })),
     };
   });
 }
@@ -295,6 +343,7 @@ export async function audit(target, options = {}) {
     onPage: () => {},
     ...options,
   };
+  opts.jar = { cookies: [] };
   // Older option names: a single viewport size and a single browser.
   if (options.viewport) opts.viewports = [options.viewport];
   if (options.browser) opts.browsers = [options.browser];

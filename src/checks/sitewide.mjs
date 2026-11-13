@@ -35,14 +35,18 @@ function readPage() {
   };
   const here = location.pathname.replace(/\/index\.html?$/, '/');
   // Same destination, written either way: /about, /about/ and /about/index.html are one page.
+  // A link to a part of a page is not a link to that page: "/#work" and "/" are different
+  // destinations, and an href of "#" or "#settings" is a control on this page, not a link.
   const destination = (a) => {
+    if ((a.getAttribute('href') || '').trim().startsWith('#')) return null;
     let u;
     try { u = new URL(a.href); } catch { return null; }
     if (!/^https?:$/.test(u.protocol)) return null;
     const path = u.pathname.replace(/\/index\.html?$/, '/').replace(/(.)\/$/, '$1');
-    return u.origin === location.origin ? path + u.search : u.origin + path + u.search;
+    const rest = u.search + (u.hash.length > 1 ? u.hash : '');
+    return u.origin === location.origin ? path + rest : u.origin + path + rest;
   };
-  const otherPage = (a) => { const d = destination(a); return d && d.startsWith('/') && d !== here.replace(/(.)\/$/, '$1'); };
+  const otherPage = (a) => { const d = destination(a)?.split("#")[0]; return d && d.startsWith('/') && d !== here.replace(/(.)\/$/, '$1'); };
 
   const main = document.querySelector('main, [role=main]');
   const inMain = (el) => !!main && main.contains(el);
