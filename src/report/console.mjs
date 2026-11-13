@@ -92,7 +92,8 @@ export function renderSummary(result, { color = false } = {}) {
     : t.failures
       ? c.red(plural(t.failures, `${result.standard} failure`))
       : c.green(`No automated ${result.standard} failures`);
-  const views = [...(result.viewports || []), ...((result.browsers || []).length > 1 ? result.browsers : [])];
+  const ENGINE = { chromium: 'Chrome', firefox: 'Firefox', webkit: 'WebKit (Safari)' };
+  const views = [...(result.viewports || []), ...((result.browsers || []).length > 1 ? result.browsers.map((b) => ENGINE[b] || b) : [])];
   lines.push(`${c.bold(result.target)}  ${verdict} across ${plural(t.pages, 'page')}  ${c.dim(`(${result.discovery}${views.length > 1 ? `; ${views.join(', ')}` : ''})`)}`);
   const tr = result.traffic;
   if (tr?.limited) lines.push(c.yellow(`The site answered "too many requests" ${plural(tr.limited, 'time')}; the audit slowed to 1 request a second. Use a lower --rate next time.`));

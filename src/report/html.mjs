@@ -176,7 +176,8 @@ export function renderHtml(result) {
   const likely = groupByRule(result.pages, 'likely');
   const advice = groupByRule(result.pages, 'advice');
   const standards = byStandard(result);
-  const views = [...(result.viewports || []), ...((result.browsers || []).length ? [result.browsers.join(' and ')] : [])].join(', ');
+  const ENGINE = { chromium: 'Chrome', firefox: 'Firefox', webkit: 'WebKit (Safari)' };
+  const views = [...(result.viewports || []), ...((result.browsers || []).length ? [result.browsers.map((b) => ENGINE[b] || b).join(' and ')] : [])].join(', ');
   const date = new Date(result.finishedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
   const verdict = t.errors
