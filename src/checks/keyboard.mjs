@@ -26,7 +26,7 @@ function describeFocus() {
   if (!el || el === document.body || el === document.documentElement) return { kind: 'none' };
   if (el.tagName === 'IFRAME' || el.tagName === 'FRAME') return { kind: 'frame' };
 
-  const state = (window.__focuswalk ||= { ids: new WeakMap(), next: 1 });
+  const state = (window.__accessready ||= { ids: new WeakMap(), next: 1 });
   if (!state.ids.has(el)) state.ids.set(el, state.next++);
   state.current = el;
 
@@ -162,9 +162,9 @@ export async function walkKeyboard(page, { maxStops = 150 } = {}) {
     if (!clip) return { f, changed: null };
     const shot = () => page.screenshot({ clip, animations: 'disabled', caret: 'hide' });
     const focused = await shot();
-    await page.evaluate(() => window.__focuswalk.current.blur());
+    await page.evaluate(() => window.__accessready.current.blur());
     const blurred = await shot();
-    await page.evaluate(() => window.__focuswalk.current.focus({ preventScroll: true }));
+    await page.evaluate(() => window.__accessready.current.focus({ preventScroll: true }));
     return { f, changed: changedPixels(focused, blurred) };
   };
   // 2.1.2 No Keyboard Trap, the other direction.
@@ -194,7 +194,7 @@ export async function walkKeyboard(page, { maxStops = 150 } = {}) {
       if (++sameStops <= INNER_STOPS) continue;
       if (!quick.inModal && await stuckBackwards(quick.id)) {
         issues.push({
-          id: 'keyboard-trap', source: 'focuswalk', kind: 'failure', wcag: ['2.1.2'], impact: 'critical',
+          id: 'keyboard-trap', source: 'accessready', kind: 'failure', wcag: ['2.1.2'], impact: 'critical',
           title: 'Keyboard focus gets stuck',
           message: `${quick.tag}${quick.label ? ` "${quick.label}"` : ''} holds keyboard focus: neither Tab nor Shift+Tab moves off it, so everything after it is out of reach`,
           selector: quick.selector, html: quick.html,
@@ -245,7 +245,7 @@ export async function walkKeyboard(page, { maxStops = 150 } = {}) {
     }
     if (f.visible === 0) {
       issues.push({
-        id: 'focus-not-obscured', source: 'focuswalk', kind: 'failure', wcag: ['2.4.11'], impact: 'serious',
+        id: 'focus-not-obscured', source: 'accessready', kind: 'failure', wcag: ['2.4.11'], impact: 'serious',
         title: 'Focused element is hidden',
         message: f.onScreen === 0
           ? `${what} takes keyboard focus while off screen, so the user cannot see where they are`
@@ -256,12 +256,12 @@ export async function walkKeyboard(page, { maxStops = 150 } = {}) {
       // WCAG counts the text cursor as a focus indicator, so a text field with nothing else
       // is weak but not a failure.
       issues.push(f.textEntry ? {
-        id: 'focus-caret-only', source: 'focuswalk', kind: 'advice', wcag: ['2.4.7'], impact: 'moderate',
+        id: 'focus-caret-only', source: 'accessready', kind: 'advice', wcag: ['2.4.7'], impact: 'moderate',
         title: 'Only the text cursor shows focus',
         message: `${what} shows no outline or other change when focused, only the text cursor`,
         ...where,
       } : {
-        id: 'focus-visible', source: 'focuswalk', kind: 'failure', wcag: ['2.4.7'], impact: 'serious',
+        id: 'focus-visible', source: 'accessready', kind: 'failure', wcag: ['2.4.7'], impact: 'serious',
         title: 'No visible focus indicator',
         message: f.invisible
           ? `${what} takes keyboard focus while invisible (opacity 0), so the user cannot see where they are`

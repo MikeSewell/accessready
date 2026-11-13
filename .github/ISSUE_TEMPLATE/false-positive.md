@@ -1,6 +1,6 @@
 ---
 name: Wrong result
-about: focuswalk reported something that isn't a problem, or missed one that is
+about: accessready reported something that isn't a problem, or missed one that is
 labels: false-positive
 ---
 
@@ -9,7 +9,7 @@ labels: false-positive
 **Command you ran**
 
 ```sh
-focuswalk ...
+accessready ...
 ```
 
 **What it printed**
@@ -21,7 +21,7 @@ focuswalk ...
 
 **Versions**
 
-- focuswalk (`focuswalk --version`):
+- accessready (`accessready --version`):
 - Node (`node --version`):
 - OS:
 - Browser (installed Chrome, or Playwright's Chromium):

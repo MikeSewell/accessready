@@ -16,7 +16,7 @@ export const version = JSON.parse(readFileSync(new URL('../package.json', import
 
 const REJECT = /^(reject|decline|deny|reject all|reject non-essential|necessary only|essential only|only necessary)$/i;
 
-export class FocuswalkError extends Error {}
+export class AccessReadyError extends Error {}
 
 // Installed Chrome first: nothing to download, and it is what visitors use. Then the
 // Chromium that `npx playwright install chromium` provides.
@@ -27,7 +27,7 @@ async function launch({ browser: choice = 'auto', proxy }) {
   for (const opts of attempts) {
     try { return await chromium.launch({ ...base, ...opts }); } catch (e) { lastError = e; }
   }
-  throw new FocuswalkError(
+  throw new AccessReadyError(
     `Could not start a browser. Install Google Chrome, or run:\n  npx playwright install chromium\n\n${String(lastError.message).split('\n')[0]}`,
   );
 }
@@ -145,8 +145,8 @@ export async function audit(target, options = {}) {
     ...options,
   };
   let start;
-  try { start = new URL(target); } catch { throw new FocuswalkError(`Not a URL: ${target}`); }
-  if (!/^https?:$/.test(start.protocol)) throw new FocuswalkError(`Only http and https URLs can be audited: ${target}`);
+  try { start = new URL(target); } catch { throw new AccessReadyError(`Not a URL: ${target}`); }
+  if (!/^https?:$/.test(start.protocol)) throw new AccessReadyError(`Only http and https URLs can be audited: ${target}`);
 
   const startedAt = new Date().toISOString();
   const browser = await launch(opts);
@@ -181,7 +181,7 @@ export async function audit(target, options = {}) {
     checkAcrossPages(pages);
 
     return {
-      tool: 'focuswalk', version, target: start.origin, discovery, startedAt, finishedAt: new Date().toISOString(),
+      tool: 'accessready', version, target: start.origin, discovery, startedAt, finishedAt: new Date().toISOString(),
       engine: pages.find((p) => p.engine)?.engine || null,
       standard: 'WCAG 2.2 AA', viewport: opts.viewport,
       totals: summarize(pages), pages,

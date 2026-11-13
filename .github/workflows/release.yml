@@ -1,4 +1,5 @@
-# Publishes to npm when a GitHub release is published. Needs an NPM_TOKEN repository secret.
+# Publishes to npm when a GitHub release is published. Uses npm trusted publishing:
+# the package's settings on npmjs.com name this repo and this workflow, so no token is stored.
 name: Release
 
 on:
@@ -13,14 +14,14 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 26
           registry-url: https://registry.npmjs.org
           cache: npm
+      # Trusted publishing needs npm 11.5 or newer.
+      - run: npm install -g npm@latest
       - run: npm ci
       - run: npm test
-      - run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - run: npm publish --access public

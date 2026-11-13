@@ -11,14 +11,14 @@ import { startSite } from '../test/helpers.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const docs = join(root, 'docs');
-const work = mkdtempSync(join(tmpdir(), 'focuswalk-images-'));
+const work = mkdtempSync(join(tmpdir(), 'accessready-images-'));
 const site = await startSite({}, 4173);
 
 const pages = ['/focus.html', '/menu.html', '/trap.html', '/overimage.html', '/inventory.html'];
 const reportFile = join(work, 'report.html');
 // Not spawnSync: the demo server lives in this process and has to keep answering.
 const run = await new Promise((done) => {
-  const child = spawn(process.execPath, [join(root, 'bin/focuswalk.mjs'), site.origin, ...pages, '--concurrency', '1', '--html', reportFile], {
+  const child = spawn(process.execPath, [join(root, 'bin/accessready.mjs'), site.origin, ...pages, '--concurrency', '1', '--html', reportFile], {
     env: { ...process.env, FORCE_COLOR: '1', NO_COLOR: '' },
   });
   let stdout = '';
@@ -30,7 +30,7 @@ const esc = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>':
 const COLORS = { 31: '#ff8f85', 32: '#7ee2a0', 33: '#ffd166', 36: '#8cc4ff', 2: '#93a0b1', 1: '#ffffff' };
 const output = run.stdout.split(/\n\nReport: /)[0];
 const ansi = esc(output).replace(/\x1b\[(\d+)m([\s\S]*?)\x1b\[0m/g, (_, code, text) => `<span style="color:${COLORS[code]};${code === '1' ? 'font-weight:700' : ''}">${text}</span>`);
-const command = `npx focuswalk ${site.origin} ${pages.join(' ')}`;
+const command = `npx accessready ${site.origin} ${pages.join(' ')}`;
 
 const shell = (body, extra = '') => `<!doctype html><html lang="en"><meta charset="utf-8"><style>
   body { margin: 0; background: #0b0f14; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #e7ebf0; }
@@ -44,11 +44,11 @@ const terminal = shell(`<div class="win"><div class="bar"><i></i><i></i><i></i><
   pre { margin: 0; padding: 20px 22px 24px; font: 15px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; color: #d5dde7; white-space: pre-wrap; }
   .prompt { color: #7ee2a0; }`);
 
-const social = shell(`<div class="card"><p class="name">focuswalk</p>
+const social = shell(`<div class="card"><p class="name">accessready</p>
   <p class="line">WCAG 2.2 AA audit for a whole site.</p>
   <p class="sub">Runs axe-core, then uses every page the way a keyboard user does, in real Chrome: missing focus rings, keyboard traps, hover-only menus, text too faint over photos.</p>
-  <pre><span class="prompt">$</span> npx focuswalk https://example.org</pre>
-  <p class="by">Open source · MIT · by Mike Sewell at Automate Impact</p></div>`, `
+  <pre><span class="prompt">$</span> npx accessready https://example.org</pre>
+  <p class="by">Open source · MIT · by Michael Sewell</p></div>`, `
   body { width: 1280px; height: 640px; }
   .card { box-sizing: border-box; width: 1280px; height: 640px; padding: 72px 84px; border-left: 14px solid #ffd166; }
   .name { font-size: 92px; font-weight: 800; margin: 0 0 14px; letter-spacing: -2px; }

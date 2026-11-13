@@ -1,24 +1,24 @@
-# focuswalk
+# accessready
 
 > WCAG 2.2 AA audit for a whole site. Runs axe-core, then uses every page the way a keyboard user does, in real Chrome, to catch what rule engines miss.
 
-[![npm](https://img.shields.io/npm/v/focuswalk.svg)](https://www.npmjs.com/package/focuswalk)
-[![CI](https://github.com/MikeSewell/focuswalk/actions/workflows/ci.yml/badge.svg)](https://github.com/MikeSewell/focuswalk/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/accessready.svg)](https://www.npmjs.com/package/accessready)
+[![CI](https://github.com/MikeSewell/accessready/actions/workflows/ci.yml/badge.svg)](https://github.com/MikeSewell/accessready/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 ```sh
-npx focuswalk https://example.org
+npx accessready https://example.org
 ```
 
-![focuswalk reporting a link with no focus indicator, a hover-only menu, a keyboard trap and text too faint over an image](docs/terminal.png)
+![accessready reporting a link with no focus indicator, a hover-only menu, a keyboard trap and text too faint over an image](docs/terminal.png)
 
 It reads the sitemap, audits every page, and exits 1 if anything fails, so it can gate a deploy.
 
 ## Why
 
-Most accessibility checkers are built on [axe-core](https://github.com/dequelabs/axe-core). It is very good at what a rules engine can decide from the page's code: contrast, labels, alt text, ARIA. focuswalk runs it on every page.
+Most accessibility checkers are built on [axe-core](https://github.com/dequelabs/axe-core). It is very good at what a rules engine can decide from the page's code: contrast, labels, alt text, ARIA. accessready runs it on every page.
 
-But many of the problems that lock people out can't be decided from code. You have to use the page. So after axe-core, focuswalk does:
+But many of the problems that lock people out can't be decided from code. You have to use the page. So after axe-core, accessready does:
 
 | It does this | To catch this | WCAG |
 |---|---|---|
@@ -60,7 +60,7 @@ For the part no tool can judge, the HTML report gives you a worklist instead of 
 
 ## Install
 
-Needs Node 20 or newer, and Google Chrome. If Chrome isn't installed, focuswalk uses Playwright's Chromium instead:
+Needs Node 22 or newer, and Google Chrome. If Chrome isn't installed, accessready uses Playwright's Chromium instead:
 
 ```sh
 npx playwright install chromium
@@ -69,26 +69,26 @@ npx playwright install chromium
 Run it without installing:
 
 ```sh
-npx focuswalk https://example.org
+npx accessready https://example.org
 ```
 
 Or add it to a project:
 
 ```sh
-npm install --save-dev focuswalk
+npm install --save-dev accessready
 ```
 
 ## Usage
 
 ```
-focuswalk <url> [path ...] [options]
+accessready <url> [path ...] [options]
 ```
 
 ```sh
-focuswalk https://example.org              # every page in /sitemap.xml
-focuswalk https://example.org / /donate    # only these paths
-focuswalk https://example.org/donate       # only this page
-focuswalk http://localhost:3000            # a local build, before it ships
+accessready https://example.org              # every page in /sitemap.xml
+accessready https://example.org / /donate    # only these paths
+accessready https://example.org/donate       # only this page
+accessready http://localhost:3000            # a local build, before it ships
 ```
 
 When you point it at localhost, URLs in the sitemap are rewritten onto localhost, so a production sitemap works against a local build.
@@ -122,12 +122,12 @@ When you point it at localhost, URLs in the sitemap are rewritten onto localhost
 
 A **failure** is a WCAG 2.2 A or AA problem the tool is sure of. A **note** is either recognized good practice that WCAG doesn't require (heading levels that skip), or something that needs a person to confirm (an element with a pointer cursor that Tab never reaches). Notes are printed but only fail the run with `--strict`.
 
-axe-core also returns items it could not judge. Where that is text over an image, focuswalk measures it: if it fails everywhere it becomes a failure, if it passes everywhere it is dropped, and if it is mixed it goes on the report's worklist with the measured range.
+axe-core also returns items it could not judge. Where that is text over an image, accessready measures it: if it fails everywhere it becomes a failure, if it passes everywhere it is dropped, and if it is mixed it goes on the report's worklist with the measured range.
 
 ## The HTML report
 
 ```sh
-focuswalk https://example.org --html report.html
+accessready https://example.org --html report.html
 ```
 
 One file, written for the person who owns the site as much as the developer who fixes it. Problems are grouped by kind, with a plain explanation of who each one affects. Below them is the worklist of what to check by hand.
@@ -147,41 +147,41 @@ name: Accessibility
 on: [pull_request]
 
 jobs:
-  focuswalk:
+  accessready:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
-      - run: npx focuswalk https://staging.example.org --html focuswalk.html
-      - uses: actions/upload-artifact@v4
+          node-version: 26
+      - run: npx accessready https://staging.example.org --html accessready.html
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: focuswalk-report
-          path: focuswalk.html
+          name: accessready-report
+          path: accessready.html
 ```
 
 GitHub's Ubuntu runners come with Chrome. On other CI systems, add `npx playwright install --with-deps chromium` before the audit.
 
-To audit the build itself, start your server in the job and point focuswalk at `http://localhost:<port>`.
+To audit the build itself, start your server in the job and point accessready at `http://localhost:<port>`.
 
 ## Logged-in pages
 
-Save a signed-in session once with Playwright, then hand it to focuswalk:
+Save a signed-in session once with Playwright, then hand it to accessready:
 
 ```sh
 npx playwright codegen --save-storage=auth.json https://app.example.org/login
-focuswalk https://app.example.org /dashboard /settings --storage-state auth.json
+accessready https://app.example.org /dashboard /settings --storage-state auth.json
 ```
 
 `auth.json` holds session cookies. Keep it out of version control.
 
-The same trick gets a timed popup out of the way: dismiss it during `codegen` and, if the site remembers that in a cookie or local storage, the saved state carries it over. If a popup does open partway through an audit and covers the page, focuswalk says so and stops walking that page rather than reporting everything behind the popup as hidden.
+The same trick gets a timed popup out of the way: dismiss it during `codegen` and, if the site remembers that in a cookie or local storage, the saved state carries it over. If a popup does open partway through an audit and covers the page, accessready says so and stops walking that page rather than reporting everything behind the popup as hidden.
 
 ## As a library
 
 ```js
-import { audit, exitCode, renderHtml } from 'focuswalk';
+import { audit, exitCode, renderHtml } from 'accessready';
 
 const result = await audit('https://example.org', { max: 10 });
 console.log(result.totals); // { pages, failures, advice, needsReview, errors }
@@ -190,13 +190,13 @@ process.exitCode = exitCode(result);
 
 ## What it does to your pages
 
-focuswalk only does what a visitor could do. It clicks Reject on a cookie banner, presses Tab, hovers menus, and presses Enter on buttons marked `aria-expanded="false"`, closing each one again. It never submits a form and never presses Enter on a link. If a button navigates away anyway, it stops operating that page and says so.
+accessready only does what a visitor could do. It clicks Reject on a cookie banner, presses Tab, hovers menus, and presses Enter on buttons marked `aria-expanded="false"`, closing each one again. It never submits a form and never presses Enter on a link. If a button navigates away anyway, it stops operating that page and says so.
 
 ## How the focus check works
 
 Reading CSS can't tell you whether a focus indicator is visible. A ring can be drawn by a wrapper with `:focus-within`, or by a pseudo-element. And a rule like `:focus { color: #333 }` on dark grey text changes a style and draws nothing you can see.
 
-So focuswalk looks at pixels. At each Tab stop it screenshots the element and a small margin around it, blurs the element, screenshots again, and counts the pixels that differ. If nothing changed, a sighted keyboard user has no way to see where they are. Two details keep it honest:
+So accessready looks at pixels. At each Tab stop it screenshots the element and a small margin around it, blurs the element, screenshots again, and counts the pixels that differ. If nothing changed, a sighted keyboard user has no way to see where they are. Two details keep it honest:
 
 - A failure is confirmed with a second look 300ms later, after transitions have finished, so a skip link that slides in is measured once it has arrived.
 - Custom checkboxes and radios hide the real input, so the label or wrapper is the area compared.
@@ -205,14 +205,14 @@ So focuswalk looks at pixels. At each Tab stop it screenshots the element and a 
 The demo pages under `test/fixtures/site` each plant one problem. Try it:
 
 ```sh
-git clone https://github.com/MikeSewell/focuswalk.git && cd focuswalk && npm install
+git clone https://github.com/MikeSewell/accessready.git && cd accessready && npm install
 node test/serve.mjs &
-node bin/focuswalk.mjs http://127.0.0.1:4173 /focus.html /menu.html /trap.html /overimage.html
+node bin/accessready.mjs http://127.0.0.1:4173 /focus.html /menu.html /trap.html /overimage.html
 ```
 
 ## What the law says
 
-focuswalk checks against WCAG 2.2 AA, which includes everything in 2.1 AA.
+accessready checks against WCAG 2.2 AA, which includes everything in 2.1 AA.
 
 In the US, WCAG 2.1 AA is the technical standard for state and local government websites under the Department of Justice's [ADA Title II rule](https://www.ada.gov/resources/2024-03-08-web-rule/). For businesses and nonprofits there is no regulation naming a WCAG version; the Department's [web guidance](https://www.ada.gov/resources/web-guidance/) says it "does not have a regulation setting out detailed standards" and names WCAG among the existing standards that "provide helpful guidance".
 
@@ -220,11 +220,11 @@ This is background, not legal advice.
 
 ## Contributing
 
-Bug reports and pull requests are welcome, especially false positives: a page where focuswalk reports something a person wouldn't. See [CONTRIBUTING.md](CONTRIBUTING.md).
+Bug reports and pull requests are welcome, especially false positives: a page where accessready reports something a person wouldn't. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Who builds this
 
-focuswalk is built by [Mike Sewell](https://msewell.com) at [Automate Impact](https://automateimpact.org), which builds software for nonprofits. It started as the script that gates our own deploys.
+accessready is built by [Michael Sewell](https://msewell.com). It started as the accessibility check he runs before every deploy of the apps he builds for nonprofits at [Automate Impact](https://automateimpact.org).
 
 ## License
 

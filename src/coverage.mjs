@@ -1,5 +1,5 @@
-// What focuswalk does about each WCAG 2.2 level A and AA success criterion.
-//   own:    ids of focuswalk's own checks that can report on it
+// What accessready does about each WCAG 2.2 level A and AA success criterion.
+//   own:    ids of accessready's own checks that can report on it
 //   guided: the report lists what a person needs to look at ("images", "media", ...)
 //   tests:  what the automated part covers, in plain words (axe-core rules are added
 //           from axe-core itself, so this never drifts from the installed version)

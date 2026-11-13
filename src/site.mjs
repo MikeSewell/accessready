@@ -23,7 +23,7 @@ function navigationOrder(pages) {
     const moved = shared.find((label, i) => i > 0 && position.get(label) < position.get(shared[i - 1]));
     if (!moved) continue;
     p.issues.push({
-      id: 'inconsistent-navigation', source: 'focuswalk', kind: 'failure', scope: 'site', wcag: ['3.2.3'], impact: 'moderate',
+      id: 'inconsistent-navigation', source: 'accessready', kind: 'failure', scope: 'site', wcag: ['3.2.3'], impact: 'moderate',
       title: 'Navigation is in a different order on this page',
       message: `the main navigation lists "${moved}" in a different place than on most other pages (usual order: ${reference.slice(0, 6).join(', ')}${reference.length > 6 ? ', ...' : ''})`,
       selector: 'nav', html: '',
@@ -45,7 +45,7 @@ function duplicateTitles(pages) {
     for (const p of group) {
       const others = group.filter((o) => o !== p).map((o) => pathOf(o.url));
       p.issues.push({
-        id: 'duplicate-title', source: 'focuswalk', kind: 'advice', scope: 'site', wcag: ['2.4.2'], impact: 'moderate',
+        id: 'duplicate-title', source: 'accessready', kind: 'advice', scope: 'site', wcag: ['2.4.2'], impact: 'moderate',
         title: 'Page title is shared with another page',
         message: `the title "${title.slice(0, 70)}" is also used by ${others.slice(0, 3).join(', ')}${others.length > 3 ? ` and ${others.length - 3} more` : ''}, so tabs, bookmarks and screen readers cannot tell them apart`,
         selector: 'title', html: '',

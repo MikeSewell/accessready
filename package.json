@@ -1,10 +1,10 @@
 {
-  "name": "focuswalk",
+  "name": "accessready",
   "version": "0.1.0",
   "description": "WCAG 2.2 AA audit for a whole site. Runs axe-core, then uses every page the way a keyboard user does, in real Chrome, to catch what rule engines miss.",
   "type": "module",
   "bin": {
-    "focuswalk": "bin/focuswalk.mjs"
+    "accessready": "bin/accessready.mjs"
   },
   "exports": "./src/index.mjs",
   "files": [
@@ -15,7 +15,7 @@
     "CHANGELOG.md"
   ],
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
     "test": "node --test --test-concurrency=1 test/*.test.mjs"
@@ -34,15 +34,15 @@
     "cli",
     "ci"
   ],
-  "author": "Mike Sewell (https://msewell.com)",
+  "author": "Michael Sewell (https://msewell.com)",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/MikeSewell/focuswalk.git"
+    "url": "git+https://github.com/MikeSewell/accessready.git"
   },
-  "homepage": "https://github.com/MikeSewell/focuswalk#readme",
+  "homepage": "https://github.com/MikeSewell/accessready#readme",
   "bugs": {
-    "url": "https://github.com/MikeSewell/focuswalk/issues"
+    "url": "https://github.com/MikeSewell/accessready/issues"
   },
   "dependencies": {
     "@axe-core/playwright": "^4.14.0",

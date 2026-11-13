@@ -2,19 +2,19 @@
 import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { audit, exitCode, version, FocuswalkError, renderHtml } from '../src/index.mjs';
+import { audit, exitCode, version, AccessReadyError, renderHtml } from '../src/index.mjs';
 import { renderPage, renderSummary } from '../src/report/console.mjs';
 
-const HELP = `focuswalk ${version}
+const HELP = `accessready ${version}
 WCAG 2.2 AA audit for a whole site, in real Chrome.
 
 Usage
-  focuswalk <url> [path ...] [options]
+  accessready <url> [path ...] [options]
 
-  focuswalk https://example.org              every page in /sitemap.xml
-  focuswalk https://example.org / /donate    only these paths
-  focuswalk https://example.org/donate       only this page
-  focuswalk http://localhost:3000            a local build, before it ships
+  accessready https://example.org              every page in /sitemap.xml
+  accessready https://example.org / /donate    only these paths
+  accessready https://example.org/donate       only this page
+  accessready http://localhost:3000            a local build, before it ships
 
 Options
   --html <file>          write a report a non-developer can read
@@ -41,7 +41,7 @@ Exit codes
 `;
 
 function fail(message) {
-  console.error(`focuswalk: ${message}`);
+  console.error(`accessready: ${message}`);
   process.exit(2);
 }
 
@@ -75,7 +75,7 @@ try {
     },
   });
 } catch (e) {
-  fail(`${e.message}\nRun focuswalk --help for usage.`);
+  fail(`${e.message}\nRun accessready --help for usage.`);
 }
 const { values: flags, positionals } = parsed;
 
@@ -124,6 +124,6 @@ try {
 
   process.exit(exitCode(result, { strict: flags.strict }));
 } catch (e) {
-  if (e instanceof FocuswalkError) fail(e.message);
+  if (e instanceof AccessReadyError) fail(e.message);
   throw e;
 }

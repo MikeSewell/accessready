@@ -4,7 +4,7 @@ All notable changes to this project are recorded here. The format follows [Keep 
 
 ## 0.1.0 - unreleased
 
-First release.
+First release. Needs Node 22 or newer.
 
 - Audits every page in a sitemap, a list of paths, or a single page, in Chrome or Playwright's Chromium.
 - Runs axe-core with the WCAG 2.0, 2.1 and 2.2 A and AA rules, including target size, plus its best-practice rules as notes.

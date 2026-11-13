@@ -7,7 +7,7 @@ labels: bug
 **What you ran**
 
 ```sh
-focuswalk ...
+accessready ...
 ```
 
 **What happened**
@@ -19,7 +19,7 @@ focuswalk ...
 
 **Versions**
 
-- focuswalk (`focuswalk --version`):
+- accessready (`accessready --version`):
 - Node (`node --version`):
 - OS:
 - Browser (installed Chrome, or Playwright's Chromium):
