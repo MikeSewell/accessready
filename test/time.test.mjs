@@ -125,3 +125,34 @@ test('flash counting follows the WCAG thresholds', () => {
   assert.equal(red.generalField, 0);
   assert.ok(red.redField > 341 * 256 * 0.25);
 });
+
+// time-hang.html locks up ten minutes after it loads, so the clock check, moving time on
+// to twenty minutes, never gets its answer. The check is stopped at its time limit (made
+// short here) and the rest of the audit goes on.
+test('a check that never finishes is stopped at its time limit, with a note, and the audit carries on', { timeout: 180_000 }, async () => {
+  const started = Date.now();
+  const r = await audit(`${site.origin}/time-hang.html`, { viewports: ['desktop'], checkTimeout: 30_000 });
+  const p = r.pages[0];
+  assert.equal(p.error, null);
+  assert.ok(p.notes.includes('the motion and timing check was stopped after 30 seconds, its time limit; what it would have found on this page is not in the report'), p.notes.join('\n'));
+  // Only the clock check was cut short: the others, the resize check on its own copy among
+  // them, still ran.
+  assert.deepEqual(p.notes.filter((n) => /was stopped after|could not finish/.test(n)), ['the motion and timing check was stopped after 30 seconds, its time limit; what it would have found on this page is not in the report']);
+  assert.ok(p.views[0].timings['motion and timing'] >= 30_000);
+  assert.ok(p.views[0].timings['zoom and orientation'] > 0, 'the other checks still ran');
+  assert.ok(Date.now() - started < 150_000);
+});
+
+// A check that works on the page itself but opens copies of its own: the pointer check
+// presses the button in a copy, the copy locks up, and only that copy is closed.
+test('a check on the page itself that hangs in a copy it opened is stopped, and the page audit goes on', { timeout: 180_000 }, async () => {
+  const own = await startSite({ '/freeze-on-press.html': () => '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Freezes when pressed</title></head><body><main><h1>Freezes when pressed</h1><button id="save" type="button">Save</button></main><script>document.getElementById("save").addEventListener("pointerdown", () => { for (;;) {} });</script></body></html>' });
+  try {
+    const r = await audit(`${own.origin}/freeze-on-press.html`, { viewports: ['desktop'], checkTimeout: 20_000 });
+    const p = r.pages[0];
+    assert.equal(p.error, null);
+    assert.deepEqual(p.notes.filter((n) => /was stopped after|could not finish/.test(n)), ['the pointer cancellation check was stopped after 20 seconds, its time limit; what it would have found on this page is not in the report']);
+  } finally {
+    await own.close();
+  }
+});

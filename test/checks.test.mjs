@@ -238,6 +238,13 @@ test('pages are compared with each other: navigation order and shared titles', a
   assert.deepEqual(r.totals, { pages: 4, failures: 1, likely: 1, advice: 2, needsReview: 0, errors: 0 });
 });
 
+test('a menu that lists a label twice, the same way on every page, is not reported as reordered', async () => {
+  // Home, Donate, About, Programs, Donate: the second Donate is a button at the end.
+  const r = await audit(site.origin, { viewports: ['desktop'], paths: ['/nav-repeat-a.html', '/nav-repeat-b.html'] });
+  assert.deepEqual(r.pages.map((p) => p.review.nav), [['Home', 'Donate', 'About', 'Programs', 'Donate'], ['Home', 'Donate', 'About', 'Programs', 'Donate']]);
+  assert.deepEqual(r.pages.map((p) => p.issues.filter((i) => i.id === 'inconsistent-navigation')), [[], []]);
+});
+
 test('with dismissal off, the banner is reported as covering the page', async () => {
   const r = await audit(`${site.origin}/banner.html`, { viewports: ['desktop'], dismiss: false });
   assert.equal(r.discovery, 'single page');

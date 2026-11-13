@@ -6,7 +6,8 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
-import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { gzipSync } from 'node:zlib';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -263,6 +264,54 @@ test('a fault inside the AI review itself becomes a note, not a failed audit', a
   assert.ok(r.pages[0].notes.includes('AI review: could not finish: the plan could not be printed'));
   assert.equal(fake.requests.length, 0);
   assert.equal(r.ai.failed, true);
+});
+
+test('a picture fetched for the review is dropped at its size cap, whatever the server sends', async () => {
+  // A picture from another host cannot be read off the page's canvas, so it is downloaded
+  // again for the review. The browser is shown a small PNG each time; the download gets a
+  // real PNG for one, a body that never stops for one, and for the last a 400 KB gzip body
+  // that expands to 400 MB.
+  const MB = 1024 * 1024;
+  const png = readFileSync(new URL('./fixtures/site/photo.png', import.meta.url));
+  const bomb = Buffer.concat(Array(400).fill(gzipSync(Buffer.alloc(MB))));
+  const endless = { sent: 0, closed: false };
+  const pictures = createServer((req, res) => {
+    if (req.headers['sec-fetch-dest'] === 'image' || req.url === '/small.png') { res.writeHead(200, { 'content-type': 'image/png' }); return res.end(png); }
+    if (req.url === '/bomb.png') { res.writeHead(200, { 'content-type': 'image/png', 'content-encoding': 'gzip' }); return res.end(bomb); }
+    res.writeHead(200, { 'content-type': 'image/png' });
+    res.on('close', () => { endless.closed = true; });
+    const chunk = Buffer.alloc(64 * 1024);
+    const pump = () => {
+      while (endless.sent < 100 * MB && !res.destroyed) {
+        endless.sent += chunk.length;
+        if (!res.write(chunk)) return res.once('drain', pump);
+      }
+      if (!res.destroyed) res.end();
+    };
+    pump();
+  });
+  await new Promise((done) => pictures.listen(0, '127.0.0.1', done));
+  const host = `http://localhost:${pictures.address().port}`;
+  const img = (name, alt) => `<p><img src="${host}/${name}" width="120" height="80" alt="${alt}"></p>`;
+  const own = await startSite({ '/ai-pictures.html': () => `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Pictures</title></head><body><main><h1>Pictures</h1>${img('small.png', 'Volunteers at the food bank')}${img('endless.png', 'The warehouse')}${img('bomb.png', 'The delivery van')}</main></body></html>` });
+  fake.reset();
+  const base = process.memoryUsage().rss;
+  let peak = base;
+  const sampler = setInterval(() => { peak = Math.max(peak, process.memoryUsage().rss); }, 20);
+  try {
+    const r = await audit(own.origin, { viewports: ['desktop'], paths: ['/ai-pictures.html'], ai: { retryDelay: 10, ...anthropic({ cache: false }) } });
+    assert.equal(r.pages[0].error, null);
+  } finally {
+    clearInterval(sampler);
+    await own.close();
+    await new Promise((done) => { pictures.closeAllConnections(); pictures.close(done); });
+  }
+  const sentPictures = fake.requests[0].body.messages[0].content.filter((c) => c.type === 'image');
+  assert.equal(sentPictures.length, 1, 'only the real PNG was sent');
+  assert.deepEqual(Buffer.from(sentPictures[0].source.data, 'base64'), png);
+  assert.ok(endless.closed, 'the endless download was stopped');
+  assert.ok(endless.sent < 50 * MB, `${Math.round(endless.sent / MB)} MB were sent`);
+  assert.ok(peak - base < 150 * MB, `memory grew by ${Math.round((peak - base) / MB)} MB`);
 });
 
 test('without --ai nothing is sent and nothing is read for it', async () => {

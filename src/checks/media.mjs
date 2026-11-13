@@ -239,11 +239,16 @@ function readVimeo() {
 }
 
 // In a YouTube player frame, once it has loaded the video: its caption tracks. Tracks of
-// kind "asr" are YouTube's automatic captions.
+// kind "asr" are YouTube's automatic captions. The caption list only means something when
+// YouTube agreed to play the video: a bot check or an age gate (common from CI and data
+// centre addresses) answers with videoDetails and no captions at all, which would read as a
+// video with none. Anything but status OK is returned as `unplayable`, and judged by nobody.
 function readYouTube() {
   const player = document.querySelector('#movie_player');
   const response = player && typeof player.getPlayerResponse === 'function' ? player.getPlayerResponse() : null;
   if (!response || !response.videoDetails) return null;
+  const status = response.playabilityStatus && response.playabilityStatus.status;
+  if (status !== 'OK') return { unplayable: String(status || 'no playability status') };
   return {
     live: !!response.videoDetails.isLive,
     tracks: ((response.captions && response.captions.playerCaptionsTracklistRenderer && response.captions.playerCaptionsTracklistRenderer.captionTracks) || [])
@@ -324,6 +329,7 @@ async function checkYouTube(page, ctx) {
   })).embeds.filter((e) => e.provider === 'youtube');
   const issues = [];
   let unread = 0;
+  const refused = [];
   for (const e of embeds.slice(0, MAX_YOUTUBE)) {
     const frame = await frameFor(p, e.src);
     let info = null;
@@ -337,10 +343,12 @@ async function checkYouTube(page, ctx) {
       await frame.evaluate(() => document.querySelector('#movie_player')?.pauseVideo?.()).catch(() => {});
     }
     if (!info) { unread++; continue; }
+    if (info.unplayable) { refused.push(info.unplayable); continue; }
     issues.push(...embedCaptionIssues({ provider: 'youtube', ...info, live: info.live || e.live, controlsOff: e.controlsOff, selector: e.selector, html: e.html }));
   }
   const notes = [];
   if (unread) notes.push(`could not read the caption tracks of ${unread} YouTube player(s) (the video did not load, or embedding is blocked); check their captions by hand`);
+  if (refused.length) notes.push(`could not read the caption tracks of ${refused.length} YouTube player(s): YouTube would not play the video to this browser (${[...new Set(refused)].join(', ')}), as it often does for automated browsers and data centre addresses; check their captions by hand`);
   if (embeds.length > MAX_YOUTUBE) notes.push(`read captions from the first ${MAX_YOUTUBE} YouTube players only; ${embeds.length - MAX_YOUTUBE} more were not checked`);
   return { issues, notes };
 }

@@ -11,6 +11,7 @@
 // hosts were contacted.
 import { getDocument, OPS } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { issue } from './index.mjs';
+import { cappedGet, TooLarge } from '../download.mjs';
 
 const MAX_DOCUMENTS = 25;
 const MAX_BYTES = 20 * 1024 * 1024;
@@ -42,28 +43,30 @@ async function collectLinks(page, ctx) {
   return [];
 }
 
-// Downloads one PDF. Playwright's request context cannot stop a download part way, so the
-// size cap is asked of the server with a Range header (static hosts, CDNs and S3 honour it)
-// and checked again on what arrived; a server that ignores Range is still bounded by the
-// time limit.
-async function download(context, url) {
-  const res = await context.request.get(url, {
-    timeout: DOWNLOAD_TIMEOUT, maxRedirects: 5, failOnStatusCode: false,
-    headers: { Range: `bytes=0-${MAX_BYTES}` },
-  });
+// Downloads one PDF. The size cap is asked of the server with a Range header (static hosts,
+// CDNs and S3 honour it), checked against the size the server declares, and enforced on the
+// decoded bytes as they arrive, so a server that ignores Range, or a small compressed body
+// that expands to gigabytes, is dropped at the cap instead of filling memory.
+async function download(context, url, proxy) {
+  let res;
   try {
-    if (res.status() >= 400) return { error: `the server answered ${res.status()}` };
-    const total = Number(/\/(\d+)$/.exec(res.headers()['content-range'] || '')?.[1] || res.headers()['content-length'] || 0);
-    if (total > MAX_BYTES) return { error: `it is larger than ${MAX_BYTES / 1024 / 1024} MB` };
-    const body = await res.body();
-    if (body.length > MAX_BYTES) return { error: `it is larger than ${MAX_BYTES / 1024 / 1024} MB` };
-    if (!body.subarray(0, 1024).includes('%PDF-')) {
-      return { error: /html/i.test(res.headers()['content-type'] || '') ? 'the link returned a web page, not a PDF (a login page or an error page?)' : 'the file is not a PDF' };
-    }
-    return { body };
-  } finally {
-    await res.dispose().catch(() => {});
+    res = await cappedGet(context, url, {
+      maxBytes: MAX_BYTES, timeout: DOWNLOAD_TIMEOUT, maxRedirects: 5, proxy,
+      headers: { Range: `bytes=0-${MAX_BYTES}` },
+      inspect: (status, headers) => {
+        const total = Number(/\/(\d+)$/.exec(headers['content-range'] || '')?.[1] || 0);
+        if (total > MAX_BYTES) throw new TooLarge();
+      },
+    });
+  } catch (e) {
+    if (e instanceof TooLarge) return { error: `it is larger than ${MAX_BYTES / 1024 / 1024} MB` };
+    throw e;
   }
+  if (res.status >= 400) return { error: `the server answered ${res.status}` };
+  if (!res.body.subarray(0, 1024).includes('%PDF-')) {
+    return { error: /html/i.test(res.headers['content-type'] || '') ? 'the link returned a web page, not a PDF (a login page or an error page?)' : 'the file is not a PDF' };
+  }
+  return { body: res.body };
 }
 
 const asMap = (v) => (v instanceof Map ? v : new Map(Object.entries(v || {})));
@@ -121,9 +124,9 @@ function problems(d) {
   return out;
 }
 
-async function check(context, url) {
+async function check(context, url, proxy) {
   try {
-    const got = await download(context, url);
+    const got = await download(context, url, proxy);
     if (got.error) return { note: `could not be checked: ${got.error}` };
     return { problems: problems(await read(got.body)) };
   } catch (e) {
@@ -154,7 +157,7 @@ async function checkDocuments(pages, ctx) {
     const worker = async () => {
       for (let d = queue.shift(); d; d = queue.shift()) {
         const key = `document ${d.link.url}`;
-        const pending = contextFor().then((c) => check(c, d.link.url));
+        const pending = contextFor().then((c) => check(c, d.link.url, ctx.opts?.proxy));
         cache.set(key, pending);
         await pending;
       }
