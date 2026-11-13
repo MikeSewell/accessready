@@ -38,6 +38,9 @@ Options
                          (default desktop,phone)
   --viewport <WxH>       one screen size only, for example 768x1024
   --max-tab-stops <n>    most Tab presses per page (default 150)
+  --rate <n>             most requests a second to the audited site, after a short burst
+                         (default 8; 0 for no limit). Assets are fetched once per audit
+                         and the audit slows down by itself if the site says it is busy
   --timeout <ms>         page load timeout (default 45000)
   --browser <list>       auto, chrome, chromium, firefox, webkit, or all; comma separated
                          (default auto: installed Chrome, else Playwright's Chromium)
@@ -124,6 +127,7 @@ try {
       viewports: { type: 'string' },
       level: { type: 'string' },
       'max-tab-stops': { type: 'string' },
+      rate: { type: 'string' },
       timeout: { type: 'string' },
       browser: { type: 'string' },
       proxy: { type: 'string' },
@@ -156,11 +160,11 @@ try { ({ config, path: configPath } = loadConfig(given.config)); } catch (e) {
 // One value per option: the flag if given, else the config file, else the default. Flags
 // arrive as strings; config values can also be numbers and lists, so they are turned into
 // the same strings and checked by the same code below.
-const DEFAULTS = { max: '40', concurrency: '2', viewports: 'desktop,phone', level: 'AA', 'max-tab-stops': '150', timeout: '45000', browser: 'auto' };
+const DEFAULTS = { max: '40', concurrency: '2', rate: '8', viewports: 'desktop,phone', level: 'AA', 'max-tab-stops': '150', timeout: '45000', browser: 'auto' };
 const CONFIG_KEY = {
   html: 'html', json: 'json', sarif: 'sarif', baseline: 'baseline', sitemap: 'sitemap', max: 'max', concurrency: 'concurrency',
   'storage-state': 'storageState', viewport: 'viewport', viewports: 'viewports', level: 'level', 'max-tab-stops': 'maxTabStops',
-  timeout: 'timeout', browser: 'browser', proxy: 'proxy',
+  timeout: 'timeout', browser: 'browser', proxy: 'proxy', rate: 'rate',
 };
 const flags = {};
 for (const [flag, key] of Object.entries(CONFIG_KEY)) {
@@ -259,6 +263,7 @@ try {
     viewports,
     level,
     maxTabStops: positiveInt(flags['max-tab-stops'], '--max-tab-stops'),
+    rate: (() => { const n = Number(flags.rate); if (!Number.isFinite(n) || n < 0) fail(`--rate needs a number of requests a second, or 0 for no limit, got "${flags.rate}"`); return n; })(),
     timeout: positiveInt(flags.timeout, '--timeout'),
     browsers,
     proxy: flags.proxy || null,
@@ -295,6 +300,7 @@ try {
   }
   process.exit(comparison ? baselineExitCode(result, comparison, { strict: flags.strict }) : exitCode(result, { strict: flags.strict }));
 } catch (e) {
-  if (e instanceof AccessReadyError) fail(e.message);
-  throw e;
+  // Anything that stops the audit, expected or not, is exit 2: 1 means failures were found.
+  if (!(e instanceof AccessReadyError) && process.env.ACCESSREADY_DEBUG) console.error(e);
+  fail(e instanceof AccessReadyError ? e.message : `the audit stopped: ${String(e?.message || e).split('\n')[0]}${process.env.ACCESSREADY_DEBUG ? '' : ' (set ACCESSREADY_DEBUG=1 for details)'}`);
 }

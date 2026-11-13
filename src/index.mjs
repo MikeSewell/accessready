@@ -7,6 +7,7 @@ import { measureContrastOnImages } from './checks/contrast.mjs';
 import { checkUnreachable, checkHoverMenus, checkDisclosures } from './checks/interact.mjs';
 import { PROBES, SITE_PROBES } from './checks/index.mjs';
 import { instrument } from './instrument.mjs';
+import { traffic } from './polite.mjs';
 import { takeInventory } from './inventory.mjs';
 import { checkAcrossPages } from './site.mjs';
 import { discoverFromSitemap } from './sitemap.mjs';
@@ -84,6 +85,7 @@ async function newContext(browser, viewport, opts, { reducedMotion = 'reduce', .
     ...extra,
   });
   await context.addInitScript(instrument);
+  await opts.traffic?.attach(context);
   return context;
 }
 
@@ -142,7 +144,9 @@ async function auditPage(browser, url, viewport, opts) {
     let loaded;
     try {
       loaded = await timed(result, 'load', () => loadPage(page, url, opts));
+      opts.traffic?.loaded();
     } catch (e) {
+      opts.traffic?.failed(e.message);
       result.error = `could not load: ${String(e.message).split('\n')[0]}`;
       return result;
     }
@@ -274,7 +278,7 @@ async function auditPage(browser, url, viewport, opts) {
 
 // Each page was audited once per screen size and browser. Fold those into one entry per page:
 // a finding seen everywhere is listed once, one seen only somewhere says where.
-function mergeViews(audits) {
+export function mergeViews(audits) {
   const byUrl = new Map();
   for (const a of audits) {
     if (!byUrl.has(a.url)) byUrl.set(a.url, []);
@@ -282,26 +286,31 @@ function mergeViews(audits) {
   }
   const label = (a) => a.viewport + (new Set(audits.map((x) => x.browser)).size > 1 ? ` ${a.browser}` : '');
   return [...byUrl.values()].map((views) => {
-    const first = views[0];
+    // A view that could not be audited makes the page an error: its findings are missing, and
+    // calling the others "desktop only" would hide that.
+    const ok = views.filter((v) => !v.error);
+    const failed = views.filter((v) => v.error);
+    const first = ok[0] || views[0];
     const issues = new Map();
-    for (const v of views) for (const i of v.issues) {
+    for (const v of ok) for (const i of v.issues) {
       const key = `${i.kind}|${i.id}|${i.selector}|${i.message}`;
       if (!issues.has(key)) issues.set(key, { ...i, seenOn: [] });
       issues.get(key).seenOn.push(label(v));
     }
-    const everywhere = views.map(label);
+    const everywhere = ok.map(label);
     const notes = new Map();
-    for (const v of views) for (const n of v.notes) {
+    for (const v of ok) for (const n of v.notes) {
       if (!notes.has(n)) notes.set(n, []);
       notes.get(n).push(label(v));
     }
-    const review = first.review;
+    const error = !failed.length ? null
+      : !ok.length ? first.error
+      : failed.map((v) => `${label(v)}: ${v.error}`).join('; ');
     return {
-      url: first.url, status: first.status,
-      error: views.every((v) => v.error) ? first.error : null,
+      url: first.url, status: first.status, error,
       engine: first.engine,
       issues: [...issues.values()].map((i) => ({ ...i, seenOn: i.seenOn.length === everywhere.length ? null : i.seenOn })),
-      needsReview: first.needsReview, review, tabStops: first.tabStops,
+      needsReview: first.needsReview, review: first.review, tabStops: first.tabStops,
       notes: [...notes].map(([n, on]) => (on.length === everywhere.length ? n : `${n} (${on.join(', ')})`)),
       views: views.map((v) => ({ viewport: v.viewport, browser: v.browser, tabStops: v.tabStops, error: v.error, timings: v.timings })),
     };
@@ -339,11 +348,12 @@ export async function audit(target, options = {}) {
   const opts = {
     paths: [], sitemap: null, max: 40, concurrency: 2, timeout: 45000, maxTabStops: 150,
     viewports: ['desktop', 'phone'], browsers: ['auto'], level: 'AA',
-    dismiss: true, proxy: null, storageState: null, ai: null,
+    dismiss: true, proxy: null, storageState: null, rate: 8, ai: null,
     onPage: () => {},
     ...options,
   };
   opts.jar = { cookies: [] };
+  if (opts.rate !== 0 && !(Number.isFinite(opts.rate) && opts.rate > 0)) throw new AccessReadyError(`--rate needs a number of requests a second, or 0 for no limit; got ${opts.rate}`);
   // Older option names: a single viewport size and a single browser.
   if (options.viewport) opts.viewports = [options.viewport];
   if (options.browser) opts.browsers = [options.browser];
@@ -362,6 +372,7 @@ export async function audit(target, options = {}) {
   if (!/^https?:$/.test(start.protocol)) throw new AccessReadyError(`Only http and https URLs can be audited: ${target}`);
 
   const startedAt = new Date().toISOString();
+  opts.traffic = traffic(start.origin, { rate: opts.rate });
   const browsers = [];
   try {
     for (const b of opts.browsers) browsers.push(await launch(b, opts.proxy));
@@ -401,7 +412,12 @@ export async function audit(target, options = {}) {
     const worker = async () => {
       for (let i = next++; i < jobs.length; i = next++) {
         const { browser, viewport, url } = jobs[i];
-        pages[i] = await auditPage(browser, url, viewport, opts);
+        // A site that stopped accepting connections partway through is probably limiting or
+        // blocking this machine. Asking again would only make that worse.
+        pages[i] = opts.traffic.stats.refused
+          ? { url, viewport: viewport.name, browser: engineOf(browser), status: null, issues: [], needsReview: [], review: null, tabStops: 0, notes: [], timings: {},
+              error: 'not audited: the site stopped accepting connections partway through, so it may be limiting or blocking this machine. Wait a while, then try again with a lower --rate or --concurrency 1' }
+          : await auditPage(browser, url, viewport, opts);
         done.set(url, [...(done.get(url) || []), pages[i]]);
         if (done.get(url).length === perUrl) opts.onPage(mergeViews(done.get(url))[0], urls.indexOf(url), urls.length);
       }
@@ -450,6 +466,7 @@ export async function audit(target, options = {}) {
       engine: pages.find((p) => p.engine)?.engine || null,
       standard: `WCAG 2.2 ${opts.level}`, level: opts.level,
       viewports: viewports.map((v) => v.name), browsers: [...new Set(pages.map((p) => p.browser))],
+      traffic: { rate: opts.rate, ...opts.traffic.stats },
       totals: summarize(merged), pages: merged,
       ...(ai ? { ai: ai.summary } : {}),
     };

@@ -11,21 +11,41 @@ export function instrument() {
   const listeners = new WeakMap();
   define(window, '__accessready_listeners', listeners);
 
+  // Listeners are recorded the way the browser keeps them: one per type, function and capture
+  // flag. A listener added with `once` is dropped when it fires, and one added with a signal
+  // when the signal aborts, so the record never lists a listener the page no longer has.
   const add = EventTarget.prototype.addEventListener;
   const remove = EventTarget.prototype.removeEventListener;
+  const captureOf = (opts) => (typeof opts === 'boolean' ? opts : !!opts?.capture);
+  const entries = (target, type) => {
+    if (!listeners.has(target)) listeners.set(target, new Map());
+    const m = listeners.get(target);
+    if (!m.has(type)) m.set(type, new Map());
+    return m.get(type);
+  };
   EventTarget.prototype.addEventListener = function (type, fn, opts) {
     try {
-      if (!listeners.has(this)) listeners.set(this, new Map());
-      const m = listeners.get(this);
-      m.set(type, (m.get(type) || 0) + 1);
-      if (type === 'devicemotion' || type === 'deviceorientation') log.motion++;
+      if (fn && !opts?.signal?.aborted) {
+        const capture = captureOf(opts);
+        const byFn = entries(this, type);
+        if (!byFn.has(fn)) byFn.set(fn, new Set());
+        const flags = byFn.get(fn);
+        if (!flags.has(capture)) {
+          flags.add(capture);
+          const forget = () => { flags.delete(capture); if (!flags.size) byFn.delete(fn); };
+          if (opts?.once) add.call(this, type, forget, { once: true, capture });
+          if (opts?.signal) add.call(opts.signal, 'abort', forget, { once: true });
+          if (type === 'devicemotion' || type === 'deviceorientation') log.motion++;
+        }
+      }
     } catch { /* never break the page */ }
     return add.call(this, type, fn, opts);
   };
   EventTarget.prototype.removeEventListener = function (type, fn, opts) {
     try {
-      const m = listeners.get(this);
-      if (m && m.get(type) > 0) m.set(type, m.get(type) - 1);
+      const byFn = listeners.get(this)?.get(type);
+      const flags = byFn?.get(fn);
+      if (flags) { flags.delete(captureOf(opts)); if (!flags.size) byFn.delete(fn); }
     } catch { /* never break the page */ }
     return remove.call(this, type, fn, opts);
   };
@@ -53,7 +73,8 @@ export function instrument() {
   for (const name of ['AudioContext', 'webkitAudioContext']) {
     const Original = window[name];
     if (typeof Original !== 'function') continue;
-    window[name] = new Proxy(Original, { construct(target, args) { log.audioContexts++; return new target(...args); } });
+    // Reflect.construct keeps a page's own subclass (class Synth extends AudioContext) intact.
+    window[name] = new Proxy(Original, { construct(target, args, newTarget) { log.audioContexts++; return Reflect.construct(target, args, newTarget); } });
   }
 }
 
@@ -63,7 +84,7 @@ export function listenerTypesSource() {
   return `(el) => {
     const types = new Set();
     const m = window.__accessready_listeners && window.__accessready_listeners.get(el);
-    if (m) for (const [type, n] of m) if (n > 0) types.add(type);
+    if (m) for (const [type, byFn] of m) if (byFn.size > 0) types.add(type);
     for (const key of ['onclick', 'onmousedown', 'onmouseup', 'onpointerdown', 'onpointerup', 'ontouchstart', 'ontouchend', 'ontouchmove', 'onkeydown', 'onkeyup', 'onkeypress', 'onmouseover', 'onmouseenter', 'onfocus', 'onchange', 'oninput', 'onpaste', 'ondragstart', 'onpointermove', 'onmousemove'])
       if (typeof el[key] === 'function' || el.hasAttribute?.(key)) types.add(key.slice(2));
     return [...types];

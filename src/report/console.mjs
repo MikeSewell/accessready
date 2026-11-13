@@ -94,6 +94,9 @@ export function renderSummary(result, { color = false } = {}) {
       : c.green(`No automated ${result.standard} failures`);
   const views = [...(result.viewports || []), ...((result.browsers || []).length > 1 ? result.browsers : [])];
   lines.push(`${c.bold(result.target)}  ${verdict} across ${plural(t.pages, 'page')}  ${c.dim(`(${result.discovery}${views.length > 1 ? `; ${views.join(', ')}` : ''})`)}`);
+  const tr = result.traffic;
+  if (tr?.limited) lines.push(c.yellow(`The site answered "too many requests" ${plural(tr.limited, 'time')}; the audit slowed to 1 request a second. Use a lower --rate next time.`));
+  if (tr?.refused) lines.push(c.red('The site stopped accepting connections partway through and the remaining pages were not audited. It may be limiting or blocking this machine.'));
   if (t.likely) lines.push(c.yellow(`${plural(t.likely, 'likely problem')} a person should confirm; these do not fail the run unless --strict is set`));
   if (t.advice) lines.push(c.dim(`${plural(t.advice, 'best-practice note')}; these do not fail the run unless --strict is set`));
   if (t.needsReview) lines.push(c.dim(`${plural(t.needsReview, 'element')} the checks could not judge; a person has to look at them`));

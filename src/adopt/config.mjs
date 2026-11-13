@@ -38,6 +38,7 @@ const KEYS = {
   concurrency: [int, 'a whole number above 0'],
   maxTabStops: [int, 'a whole number above 0'],
   timeout: [int, 'a whole number above 0'],
+  rate: [(v) => typeof v === 'number' && v >= 0, 'a number of requests a second, 0 for no limit'],
   level: [(v) => ['A', 'AA', 'AAA'].includes(String(v).toUpperCase()), 'A, AA or AAA'],
   viewports: [list, 'a list of screen sizes'],
   viewport: [str, 'a screen size such as 768x1024'],
