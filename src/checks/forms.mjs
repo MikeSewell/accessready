@@ -280,7 +280,10 @@ function readForms(h) {
     // The other convention (GOV.UK, Shopify checkout): optional fields say "(optional)" and
     // every field without it is required. That marks the required ones too.
     const optionalMarked = fields.some((f) => !required(f) && OPTIONAL.test(labelText(f)));
-    const unmarked = req.filter((f) => !MARKED.test(labelText(f)));
+    // A radio or checkbox group is marked in its legend ("Contact me by (required)"), not on
+    // each option; so is any field whose fieldset legend says the whole group is required.
+    const legendOf = (f) => h.clean(f.closest('fieldset')?.querySelector('legend')?.textContent || '');
+    const unmarked = req.filter((f) => !MARKED.test(labelText(f)) && !MARKED.test(legendOf(f)));
     // Nobody expects to log in without a username and password, so a login form needs no marker.
     if (unmarked.length && !formSaysAll && !optionalMarked && !info.login) {
       // Labels of required fields in a different color from the others, with no text marker.

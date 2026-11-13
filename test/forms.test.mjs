@@ -42,6 +42,8 @@ const AA = {
   // sign-up form taken for a login.
   'form-donate': [],
   'form-optional-marked': [],
+  // A required radio group marked in its legend, not on each option.
+  'form-legend-required': [],
   'form-login-plain': [],
   'form-report-validity': [],
   'form-readonly-date': [],

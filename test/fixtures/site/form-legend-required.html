@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Volunteer sign-up</title>
+<style>
+  body { margin: 0; padding: 24px; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  label, legend { display: block; margin: 12px 0 4px; }
+  input[type=text], input[type=email] { font: inherit; padding: 8px; border: 2px solid #555; min-height: 44px; }
+  fieldset { border: 2px solid #555; padding: 12px; margin: 16px 0; }
+  .choice label { display: inline-block; margin: 0 16px 0 4px; }
+  button { font: inherit; padding: 10px 16px; min-height: 44px; }
+</style>
+</head>
+<body>
+<main>
+<h1>Volunteer sign-up</h1>
+<form action="/volunteer" method="post">
+  <label for="name">Full name (required)</label>
+  <input id="name" name="name" type="text" autocomplete="name" required>
+  <fieldset>
+    <legend>Which day works for you? (required)</legend>
+    <div class="choice"><input id="sat" name="day" type="radio" value="sat" required><label for="sat">Saturday</label></div>
+    <div class="choice"><input id="sun" name="day" type="radio" value="sun" required><label for="sun">Sunday</label></div>
+  </fieldset>
+  <button type="submit">Sign up</button>
+</form>
+</main>
+</body>
+</html>
