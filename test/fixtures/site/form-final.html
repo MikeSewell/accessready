@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ballot that cannot be changed</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main, footer, header { padding: 24px; }
+  a { color: #0b4a8f; }
+  label { display: block; margin-top: 12px; }
+  input, button, textarea, select { font: inherit; padding: 8px 12px; margin: 4px 0; border: 1px solid #555; }
+  fieldset label { display: inline-block; margin-right: 16px; }
+  .error { color: #a00; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Board election</h1>
+  <form action="/submit" method="post" novalidate aria-label="Ballot">
+    <p>Votes cannot be changed once they are sent.</p>
+    <fieldset>
+      <legend>Choose one person for chair</legend>
+      <label><input type="radio" name="chair" value="a"> Ana Ruiz</label>
+      <label><input type="radio" name="chair" value="b"> Ben Okafor</label>
+    </fieldset>
+    <button type="submit">Cast my vote</button>
+  </form>
+</main>
+</body>
+</html>

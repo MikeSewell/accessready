@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Donation with the review at the payment provider</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main, footer, header { padding: 24px; }
+  a { color: #0b4a8f; }
+  label { display: block; margin-top: 12px; }
+  input, button, textarea, select { font: inherit; padding: 8px 12px; margin: 4px 0; border: 1px solid #555; }
+  fieldset label { display: inline-block; margin-right: 16px; }
+  .error { color: #a00; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Give today</h1>
+  <p>Your gift buys food for families in our county. You pay on the next page, through PayPal.</p>
+  <form action="/submit" method="post">
+    <fieldset>
+      <legend>Amount</legend>
+      <label><input type="radio" name="amount" value="25"> $25</label>
+      <label><input type="radio" name="amount" value="50"> $50</label>
+      <label><input type="radio" name="amount" value="100"> $100</label>
+    </fieldset>
+    <button type="submit">Donate</button>
+  </form>
+</main>
+</body>
+</html>

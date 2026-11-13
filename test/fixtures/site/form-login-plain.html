@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Login with nothing marked required</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main, footer, header { padding: 24px; }
+  a { color: #0b4a8f; }
+  label { display: block; margin-top: 12px; }
+  input, button, textarea, select { font: inherit; padding: 8px 12px; margin: 4px 0; border: 1px solid #555; }
+  fieldset label { display: inline-block; margin-right: 16px; }
+  .error { color: #a00; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Log in</h1>
+  <p>Volunteers log in to see their shifts.</p>
+  <form action="/submit" method="post">
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" autocomplete="username" required>
+    <label for="pw">Password</label>
+    <input id="pw" name="pw" type="password" autocomplete="current-password" required>
+    <button type="submit">Log in</button>
+  </form>
+</main>
+</body>
+</html>

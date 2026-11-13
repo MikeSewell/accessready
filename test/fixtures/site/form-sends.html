@@ -16,15 +16,15 @@
 <body>
 <main>
   <h1>Ways to reach us</h1>
-  <p>Each form below would send something to the server if it were allowed to.</p>
+  <p>Each form below would send something to the server if it were allowed to. None of them is final: the server checks what arrives.</p>
   <form action="/submit" method="post" novalidate aria-label="Message">
     <label for="msg">Message (required)</label>
     <textarea id="msg" name="msg" required></textarea>
     <button type="submit">Send message</button>
   </form>
-  <form id="by-script" action="/submit" aria-label="Topic">
-    <label for="topic">Topic</label>
-    <input id="topic" name="topic" type="text">
+  <form id="by-script" action="/submit" novalidate aria-label="Topic">
+    <label for="topic">Topic (required)</label>
+    <input id="topic" name="topic" type="text" required>
     <button type="submit">Suggest topic</button>
   </form>
   <form action="/submit-new-window" method="post" target="_blank" aria-label="Callback">

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Form that sends through a shared worker</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main, footer { padding: 24px; }
+  label { display: block; margin-top: 12px; }
+  input, button { font: inherit; padding: 8px 12px; margin: 4px 0; border: 1px solid #555; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Stay in touch</h1>
+  <p>Leave your email and we will write once a month.</p>
+  <form id="f" action="/submit" method="post" novalidate>
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" autocomplete="email">
+    <button type="submit">Send</button>
+  </form>
+</main>
+<script>  // The page hands the email to a shared worker, which posts it. Requests from a shared
+  // worker are not seen by the browser's request routing in Chromium, so the form check has to
+  // keep shared workers out of its copy altogether: the page's own, one started through an
+  // empty iframe, and one started through a new window.
+  const code = `onconnect = (e) => { const port = e.ports[0]; port.onmessage = (m) => {
+    fetch(m.data.to, { method: 'POST', body: 'email=' + encodeURIComponent(m.data.email) }).catch(() => {}); }; };`;
+  const send = (win, path) => {
+    try {
+      const worker = new win.SharedWorker(URL.createObjectURL(new Blob([code + '//' + path], { type: 'text/javascript' })));
+      worker.port.postMessage({ to: location.origin + path, email: document.getElementById('email').value });
+    } catch { /* no shared workers here */ }
+  };
+  document.getElementById('f').addEventListener('submit', (e) => {
+    e.preventDefault();
+    send(window, '/submit-shared-worker');
+    const frame = document.createElement('iframe');
+    frame.title = 'Sender';
+    document.body.append(frame);
+    send(frame.contentWindow, '/submit-shared-worker-iframe');
+    const win = window.open('', '_blank');
+    if (win) send(win, '/submit-shared-worker-window');
+  });</script>
+</body>
+</html>

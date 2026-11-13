@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Form that sends every other way</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main, footer { padding: 24px; }
+  label { display: block; margin-top: 12px; }
+  input, button { font: inherit; padding: 8px 12px; margin: 4px 0; border: 1px solid #555; }
+  iframe { border: 0; width: 1px; height: 1px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Stay in touch</h1>
+  <p>Leave your email and we will write once a month.</p>
+  <form id="f" action="/submit" method="post" novalidate>
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" autocomplete="email">
+    <button type="submit">Send</button>
+  </form>
+  <iframe id="frame" title="Sender" src="about:blank"></iframe>
+</main>
+<script>  // On submit the email goes out every way a page has besides a plain request: a dedicated
+  // worker (and a worker it starts), a form posted inside an iframe, a new window (which sends again as it closes), a
+  // WebSocket, and a beacon and a keepalive fetch when the page is closed. Every path starts
+  // with /submit, so the test server counts each one that arrives.
+  const to = (path) => location.origin + path;
+  const workerCode = `onmessage = (m) => {
+    fetch(m.data.to + '-worker', { method: 'POST', body: m.data.email }).catch(() => {});
+    try { const inner = new Worker(URL.createObjectURL(new Blob(['onmessage = (m) => fetch(m.data.to + \\'-nested-worker\\', { method: \\'POST\\', body: m.data.email }).catch(() => {})'], { type: 'text/javascript' }))); inner.postMessage(m.data); } catch {}
+  };`;
+  let email = null;
+  const tryIt = (fn) => { try { fn(); } catch { /* one path failing must not stop the others */ } };
+  document.getElementById('f').addEventListener('submit', (e) => {
+    e.preventDefault();
+    email = document.getElementById('email').value;
+    tryIt(() => { const w = new Worker(URL.createObjectURL(new Blob([workerCode], { type: 'text/javascript' }))); w.postMessage({ to: to('/submit'), email }); });
+    tryIt(() => {
+      const doc = document.getElementById('frame').contentDocument;
+      doc.body.innerHTML = '<form method="post"><input name="email"></form>';
+      const inner = doc.querySelector('form');
+      inner.action = to('/submit-iframe');
+      inner.email.value = email;
+      inner.submit();
+    });
+    tryIt(() => {
+      const win = window.open(to('/submit-popup?email=' + encodeURIComponent(email)), '_blank');
+      // The new window is told to send the email as it closes, too.
+      win.document.write('<script>addEventListener("pagehide", () => navigator.sendBeacon(' + JSON.stringify(to('/submit-popup-pagehide')) + ', ' + JSON.stringify(email) + '));<\/script>');
+    });
+    // fetchLater queues a request that the browser sends by itself when the page goes away.
+    tryIt(() => { if (window.fetchLater) fetchLater(to('/submit-fetch-later'), { method: 'POST', body: email }); });
+    tryIt(() => { const ws = new WebSocket(to('/submit-ws').replace(/^http/, 'ws')); ws.onopen = () => ws.send(email); ws.onerror = () => {}; });
+  });
+  const onLeave = () => {
+    if (email === null) return;
+    tryIt(() => navigator.sendBeacon(to('/submit-pagehide-beacon'), email));
+    tryIt(() => fetch(to('/submit-pagehide-fetch'), { method: 'POST', body: email, keepalive: true }).catch(() => {}));
+  };
+  addEventListener('pagehide', onLeave);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') onLeave(); });</script>
+</body>
+</html>
