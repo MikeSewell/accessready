@@ -57,9 +57,7 @@ test('a small flashing area passes 2.3.1 but fails 2.3.2 at AAA', () => {
 test('a page that leaves by itself after ten minutes fails 2.2.1', () => {
   const p = page(aa, AA, 'time-redirect');
   assert.deepEqual(found(p), [['failure', 'page-changes-by-itself', 'html']]);
-  // The clock moves in steps, and the steps before it (watching carousels and animations) take
-  // a few seconds of page time, so a page that leaves at 10 minutes is seen at the step after.
-  assert.match(message(p, 'page-changes-by-itself'), /leaves for another address by itself after about 1[01] minutes/);
+  assert.match(message(p, 'page-changes-by-itself'), /leaves for another address by itself after about 10 minutes/);
 });
 
 test('a page that reloads itself after five minutes fails 2.2.1 too', () => {
