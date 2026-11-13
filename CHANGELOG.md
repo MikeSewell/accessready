@@ -2,6 +2,15 @@
 
 All notable changes to this project are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+- Compares pages for consistent identification (3.2.4, flagged for a person) and consistent help (3.2.6), and looks for more than one way to find pages (2.4.5, flagged for a person).
+- Downloads each PDF linked from audited pages, once per audit, and reports untagged files (1.3.1), missing titles (2.4.2), missing language (3.1.1), scans with no text (1.1.1, 1.4.5) and long files with no bookmarks.
+- `accessready.config.json` (or `--config`): defaults for any option, and ignored findings, each with a required reason.
+- `--baseline` and `--update-baseline`: fail only on findings that are new since a saved baseline, and list what was fixed.
+- `--sarif`: SARIF 2.1.0 output for GitHub code scanning.
+- A GitHub Action (`action.yml`) that audits, uploads the HTML report, optionally uploads SARIF, and keeps one summary comment up to date on pull requests.
+
 ## 0.1.0 - 2026-11-13
 
 First release. Needs Node 22 or newer.

@@ -33,6 +33,9 @@ But many of the problems that lock people out can't be decided from code. You ha
 | Resizes to 320px wide | A page that scrolls sideways when zoomed | 1.4.10 |
 | Finds video with no controls and no pause button | Video that plays by itself and can't be stopped | 2.2.2 |
 | Compares the main navigation across every page | A menu in a different order on one page | 3.2.3 |
+| Compares header and footer links, search and help across pages | A contact link renamed on one page, or help that moves | 3.2.4, 3.2.6 |
+| Looks for search, a site map page or related links besides the menu | A site you can only get around by its menu | 2.4.5 |
+| Downloads every linked PDF and reads it | A scanned or untagged PDF, or one with no title or language | 1.1.1, 1.3.1, 2.4.2, 3.1.1 |
 
 As of axe-core 4.14, it has no rule for focus visibility, hidden focus, keyboard traps, hover-only menus, reflow or navigation order, and it hands text over images back as "needs review".
 
@@ -41,9 +44,9 @@ As of axe-core 4.14, it has no rule for focus visibility, hidden focus, keyboard
 <!-- coverage:start -->
 | Of the 86 WCAG 2.2 A and AA criteria | |
 |---|---|
-| 31 | have at least one automated check that can fail a page |
-| 16 | are not judged, but the HTML report lists exactly what a person has to look at |
-| 39 | need a person, with no help from the tool |
+| 33 | have at least one automated check that can fail a page |
+| 15 | are not judged, but the HTML report lists exactly what a person has to look at |
+| 36 | need a person, with no help from the tool |
 <!-- coverage:end -->
 
 Every criterion, what is tested and what is left to a person: [docs/COVERAGE.md](https://github.com/MikeSewell/accessready/blob/main/docs/COVERAGE.md). The table is generated from the code and checked on every commit.
@@ -97,6 +100,10 @@ When you point it at localhost, URLs in the sitemap are rewritten onto localhost
 |---|---|---|
 | `--html <file>` | | Write a report a non-developer can read |
 | `--json <file>` | | Write the full results as JSON. `-` prints to stdout |
+| `--sarif <file>` | | Write SARIF 2.1.0, for GitHub code scanning |
+| `--config <file>` | `accessready.config.json` | Options and ignored findings from a file |
+| `--baseline <file>` | | Fail only on findings that are not in this saved baseline |
+| `--update-baseline` | | Save the current findings to the `--baseline` file |
 | `--sitemap <url>` | `<url>/sitemap.xml` | Sitemap to read. Sitemap indexes are followed one level |
 | `--max <n>` | 40 | Most pages to audit from a sitemap |
 | `--concurrency <n>` | 2 | Pages audited at once |
@@ -114,9 +121,40 @@ When you point it at localhost, URLs in the sitemap are rewritten onto localhost
 
 | Code | Meaning |
 |---|---|
-| 0 | No failures |
-| 1 | Failures found |
-| 2 | The audit could not finish: bad arguments, no browser, or a page would not load |
+| 0 | No failures. With `--baseline`: no new failures |
+| 1 | Failures found. With `--baseline`: new failures found |
+| 2 | The audit could not finish: bad arguments or config, no browser, or a page would not load |
+
+### Config file
+
+Put `accessready.config.json` in the folder you run from, or name one with `--config`. It sets defaults for any option, using the option names in camelCase (`storageState`, `maxTabStops`, `dismiss: false`). Options on the command line win. File paths in it are read from the config file's folder.
+
+```json
+{
+  "url": "http://localhost:3000",
+  "paths": ["/", "/donate", "/contact"],
+  "viewports": ["desktop", "phone"],
+  "level": "AA",
+  "ignore": [
+    { "rule": "color-contrast", "page": "/blog/*", "selector": ".share-widget", "reason": "Vendor widget; fix requested in ticket 4411" }
+  ]
+}
+```
+
+With `url` set, `npx accessready` on its own runs the audit, and `npx accessready /donate` audits one path of it.
+
+Each `ignore` names a `rule` (the id shown after each finding) and may narrow it to a `page` (`*` matches anything) and a `selector`. A `reason` is required: an ignore without one stops the run with exit code 2. Ignored findings leave the totals and the reports; the console says how many, and the JSON lists each under `ignored` with its reason.
+
+### Baseline
+
+To start using accessready on a site that already has problems, save them once and fail only on new ones:
+
+```sh
+accessready https://staging.example.org --baseline accessready-baseline.json --update-baseline
+accessready https://staging.example.org --baseline accessready-baseline.json
+```
+
+The second run reports how many known findings it skipped, lists the new ones and the ones fixed since the baseline, and exits 1 only for new failures. Findings are matched by rule, page path, element and message with numbers taken out, so a contrast ratio that moves from 4.31:1 to 4.29:1, or a different host, does not count as new. Commit the baseline and refresh it with `--update-baseline` as problems get fixed.
 
 ### Failures and notes
 
@@ -139,6 +177,38 @@ One file, written for the person who owns the site as much as the developer who 
 The report passes its own audit. That is tested on every commit.
 
 ## In CI
+
+### The GitHub Action
+
+```yaml
+name: Accessibility
+on: [pull_request]
+
+permissions:
+  contents: read
+  pull-requests: write      # to comment the summary
+  # security-events: write  # with upload-sarif: true
+
+jobs:
+  accessready:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: MikeSewell/accessready@main   # pin to a release tag or commit
+        with:
+          url: https://staging.example.org
+          paths: / /donate /contact
+          # args: --viewports desktop --max 20
+          # config: accessready.config.json
+          # baseline: accessready-baseline.json
+          # upload-sarif: true
+```
+
+It installs the accessready of the tag or commit you point at, audits, uploads the HTML report as an artifact, writes the summary to the run page and, on pull requests, posts it as a comment that later runs edit instead of adding new ones. With `upload-sarif: true` the findings also appear in the repository's code scanning alerts. The step fails exactly when the command line would (exit code 1 or 2), and its `exit-code`, `html`, `json` and `sarif` outputs are there for later steps.
+
+To audit the pull request's own build, start the server in an earlier step and use `url: http://localhost:<port>`.
+
+### By hand
 
 GitHub Actions, auditing a preview or staging URL:
 

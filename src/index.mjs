@@ -299,7 +299,9 @@ export async function audit(target, options = {}) {
     for (const b of opts.browsers) browsers.push(await launch(b, opts.proxy));
 
     // What to audit: the paths given; or the one page named; or everything in the sitemap.
-    let urls, discovery;
+    // `siteUrls` is every page known to be part of the site, including sitemap entries past
+    // --max: checks such as multiple ways (2.4.5) depend on how many pages the site has.
+    let urls, discovery, siteUrls;
     const namedPage = start.pathname !== '/' || start.search;
     if (opts.paths.length) {
       urls = opts.paths.map((p) => new URL(p, start.origin).href);
@@ -309,6 +311,7 @@ export async function audit(target, options = {}) {
       discovery = 'single page';
     } else {
       const found = await discoverFromSitemap(browsers[0], opts.sitemap || start.origin + '/sitemap.xml', start.origin, opts);
+      siteUrls = found.urls;
       urls = found.urls.slice(0, opts.max);
       discovery = found.urls.length
         ? `sitemap (${found.urls.length} page${found.urls.length === 1 ? '' : 's'}${found.urls.length > opts.max ? `, first ${opts.max} audited` : ''})`
@@ -341,10 +344,11 @@ export async function audit(target, options = {}) {
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push(p);
     }
+    const siteCtx = { level: opts.level, opts, browser: browsers[0], origin: start.origin, siteUrls: siteUrls || urls, cache: new Map() };
     for (const group of groups.values()) {
       checkAcrossPages(group);
       for (const probe of SITE_PROBES) {
-        try { await probe.run(group.filter((p) => !p.error), { level: opts.level, opts, browser: browsers[0], origin: start.origin }); } catch (e) {
+        try { await probe.run(group.filter((p) => !p.error), siteCtx); } catch (e) {
           group[0]?.notes.push(`the ${probe.name} check could not finish: ${String(e.message).split('\n')[0]}`);
         }
       }

@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { audit, exitCode, version, AccessReadyError, renderHtml, VIEWPORTS, BROWSERS } from '../src/index.mjs';
+import { audit, exitCode, summarize, version, AccessReadyError, renderHtml, VIEWPORTS, BROWSERS } from '../src/index.mjs';
 import { renderPage, renderSummary } from '../src/report/console.mjs';
+import { loadConfig, ignoreOnPage, ConfigError, CONFIG_FILE } from '../src/adopt/config.mjs';
+import { readBaseline, baselineFile, compareWithBaseline, baselineExitCode, BaselineError } from '../src/adopt/baseline.mjs';
+import { toSarif } from '../src/adopt/sarif.mjs';
 
 const HELP = `accessready ${version}
 WCAG 2.2 audit for a whole site: every page, on a phone and a desktop screen.
@@ -19,6 +22,11 @@ Usage
 Options
   --html <file>          write a report a non-developer can read
   --json <file>          write the full results as JSON ("-" for stdout)
+  --sarif <file>         write SARIF 2.1.0, for GitHub code scanning
+  --config <file>        options and ignored findings from a JSON file
+                         (default: ./accessready.config.json if it exists)
+  --baseline <file>      fail only on findings that are not in this saved baseline
+  --update-baseline      save the current findings to the --baseline file
   --sitemap <url>        sitemap to read instead of <url>/sitemap.xml
   --max <n>              most pages to audit from a sitemap (default 40)
   --concurrency <n>      pages audited at once (default 2)
@@ -38,10 +46,14 @@ Options
   -v, --version
   -h, --help
 
+Options given here win over the config file. Every ignore in it needs a reason:
+  { "url": "http://localhost:3000", "level": "AA",
+    "ignore": [{ "rule": "color-contrast", "page": "/blog/*", "reason": "..." }] }
+
 Exit codes
-  0  no failures
-  1  failures found
-  2  the audit could not finish (bad arguments, no browser, a page would not load)
+  0  no failures (with --baseline: no new failures)
+  1  failures found (with --baseline: new failures found)
+  2  the audit could not finish (bad arguments or config, no browser, a page would not load)
 `;
 
 function fail(message) {
@@ -60,21 +72,26 @@ try {
   parsed = parseArgs({
     allowPositionals: true,
     options: {
+      // No defaults here: a flag left out falls back to the config file, then to DEFAULTS.
       html: { type: 'string' },
       json: { type: 'string' },
+      sarif: { type: 'string' },
+      config: { type: 'string' },
+      baseline: { type: 'string' },
+      'update-baseline': { type: 'boolean' },
       sitemap: { type: 'string' },
-      max: { type: 'string', default: '40' },
-      concurrency: { type: 'string', default: '2' },
+      max: { type: 'string' },
+      concurrency: { type: 'string' },
       'storage-state': { type: 'string' },
       viewport: { type: 'string' },
-      viewports: { type: 'string', default: 'desktop,phone' },
-      level: { type: 'string', default: 'AA' },
-      'max-tab-stops': { type: 'string', default: '150' },
-      timeout: { type: 'string', default: '45000' },
-      browser: { type: 'string', default: 'auto' },
+      viewports: { type: 'string' },
+      level: { type: 'string' },
+      'max-tab-stops': { type: 'string' },
+      timeout: { type: 'string' },
+      browser: { type: 'string' },
       proxy: { type: 'string' },
-      'no-dismiss': { type: 'boolean', default: false },
-      strict: { type: 'boolean', default: false },
+      'no-dismiss': { type: 'boolean' },
+      strict: { type: 'boolean' },
       'no-color': { type: 'boolean', default: false },
       version: { type: 'boolean', short: 'v', default: false },
       help: { type: 'boolean', short: 'h', default: false },
@@ -83,13 +100,47 @@ try {
 } catch (e) {
   fail(`${e.message}\nRun accessready --help for usage.`);
 }
-const { values: flags, positionals } = parsed;
+const { values: given, positionals } = parsed;
 
-if (flags.version) { console.log(version); process.exit(0); }
-if (flags.help) { console.log(HELP); process.exit(0); }
-if (!positionals.length) { console.error(HELP); process.exit(2); }
+if (given.version) { console.log(version); process.exit(0); }
+if (given.help) { console.log(HELP); process.exit(0); }
 
-const [target, ...paths] = positionals;
+let config, configPath;
+try { ({ config, path: configPath } = loadConfig(given.config)); } catch (e) {
+  if (e instanceof ConfigError) fail(e.message);
+  throw e;
+}
+
+// One value per option: the flag if given, else the config file, else the default. Flags
+// arrive as strings; config values can also be numbers and lists, so they are turned into
+// the same strings and checked by the same code below.
+const DEFAULTS = { max: '40', concurrency: '2', viewports: 'desktop,phone', level: 'AA', 'max-tab-stops': '150', timeout: '45000', browser: 'auto' };
+const CONFIG_KEY = {
+  html: 'html', json: 'json', sarif: 'sarif', baseline: 'baseline', sitemap: 'sitemap', max: 'max', concurrency: 'concurrency',
+  'storage-state': 'storageState', viewport: 'viewport', viewports: 'viewports', level: 'level', 'max-tab-stops': 'maxTabStops',
+  timeout: 'timeout', browser: 'browser', proxy: 'proxy',
+};
+const flags = {};
+for (const [flag, key] of Object.entries(CONFIG_KEY)) {
+  const value = config[key];
+  flags[flag] = given[flag] ?? (value === undefined ? DEFAULTS[flag] : Array.isArray(value) ? value.join(',') : String(value));
+}
+// --viewports on the command line replaces a single viewport set in the config.
+if (given.viewports && !given.viewport) flags.viewport = undefined;
+flags.strict = given.strict ?? config.strict ?? false;
+flags['no-dismiss'] = given['no-dismiss'] ?? config.dismiss === false;
+
+// With a url in the config, the command line can name just paths: accessready /donate
+const pathsOnly = config.url && positionals.length && positionals[0].startsWith('/');
+const target = pathsOnly ? config.url : positionals[0] ?? config.url;
+// The config's paths apply to a site's root URL given here (staging instead of production,
+// say), but not when the command line names one page.
+const isRoot = (url) => { try { const u = new URL(url); return u.pathname === '/' && !u.search; } catch { return false; } };
+const paths = pathsOnly ? positionals
+  : positionals.length > 1 ? positionals.slice(1)
+    : !positionals.length || isRoot(positionals[0]) ? config.paths || [] : [];
+if (!target) { console.error(HELP); process.exit(2); }
+
 if (flags.viewport && !/^\d+x\d+$/.test(flags.viewport)) fail(`--viewport needs WIDTHxHEIGHT, for example 390x844, got "${flags.viewport}"`);
 const viewports = flags.viewport ? [flags.viewport] : flags.viewports.split(',').map((v) => v.trim()).filter(Boolean);
 for (const v of viewports) if (!VIEWPORTS[v] && !/^\d+x\d+$/.test(v)) fail(`--viewports takes desktop, phone or WIDTHxHEIGHT, got "${v}"`);
@@ -99,10 +150,35 @@ const level = flags.level.toUpperCase();
 if (!['A', 'AA', 'AAA'].includes(level)) fail(`--level must be A, AA or AAA, got "${flags.level}"`);
 if (flags['storage-state'] && !existsSync(flags['storage-state'])) fail(`--storage-state file not found: ${flags['storage-state']}`);
 
+// The baseline is read now, so a missing or broken file stops the run before a browser starts.
+const updateBaseline = !!given['update-baseline'];
+if (updateBaseline && !flags.baseline) fail('--update-baseline needs --baseline <file> (or "baseline" in the config file) to know where to write');
+let baseline = null;
+if (flags.baseline && !updateBaseline) {
+  try { baseline = readBaseline(flags.baseline); } catch (e) {
+    if (e instanceof BaselineError) fail(e.message);
+    throw e;
+  }
+}
+const ignores = config.ignore || [];
+
 const jsonToStdout = flags.json === '-';
 const color = !flags['no-color'] && !process.env.NO_COLOR && !jsonToStdout && (process.stdout.isTTY || !!process.env.FORCE_COLOR);
 // With --json - the JSON owns stdout, so progress goes to stderr.
 const say = jsonToStdout ? console.error : console.log;
+
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+const MARK = { failure: 'FAIL', likely: 'LIKELY', advice: 'note' };
+
+function renderBaseline({ known, new: fresh, fixed, notChecked }) {
+  const lines = [`Baseline: ${plural(known.length, 'known finding')} skipped, ${fresh.length} new, ${fixed.length} fixed since the baseline${notChecked ? ` (${notChecked} on pages not audited this time)` : ''}`];
+  for (const f of fresh.slice(0, 20)) lines.push(`  NEW ${MARK[f.kind]}  ${f.page}  ${f.title}${f.selector ? `  ${f.selector}` : ''}`);
+  if (fresh.length > 20) lines.push(`  and ${fresh.length - 20} more new`);
+  for (const f of fixed.slice(0, 10)) lines.push(`  FIXED  ${f.page}  ${f.title}${f.selector ? `  ${f.selector}` : ''}`);
+  if (fixed.length > 10) lines.push(`  and ${fixed.length - 10} more fixed`);
+  if (fixed.length) lines.push('  Run with --update-baseline to drop fixed findings from the baseline.');
+  return lines.join('\n');
+}
 
 function write(file, content) {
   const full = resolve(file);
@@ -125,15 +201,35 @@ try {
     browsers,
     proxy: flags.proxy || null,
     dismiss: !flags['no-dismiss'],
-    onPage: (page) => say(renderPage(page, { color }) + '\n'),
+    // Ignored findings are left out of what is printed as each page finishes, too.
+    onPage: (page) => { ignoreOnPage(page, ignores); say(renderPage(page, { color }) + '\n'); },
   });
 
+  // Findings the config ignores leave the totals and the reports, and are listed in the
+  // JSON with their reason, so the decision stays visible.
+  if (ignores.length) {
+    result.ignored = result.pages.flatMap((p) => ignoreOnPage(p, ignores));
+    result.totals = summarize(result.pages);
+  }
+  const comparison = baseline ? compareWithBaseline(result, baseline) : null;
+  if (comparison) result.baseline = { file: resolve(flags.baseline), known: comparison.known.length, new: comparison.new, fixed: comparison.fixed, notChecked: comparison.notChecked };
+
   say(renderSummary(result, { color }));
+  if (result.ignored) say(`${plural(result.ignored.length, 'finding')} ignored by ${configPath ? relative(process.cwd(), configPath) || CONFIG_FILE : CONFIG_FILE}; the JSON report lists each one with its reason`);
+  if (comparison) say(renderBaseline(comparison));
   if (flags.html) say(`\nReport: ${write(flags.html, renderHtml(result))}`);
   if (jsonToStdout) process.stdout.write(JSON.stringify(result, null, 2) + '\n');
   else if (flags.json) say(`JSON:   ${write(flags.json, JSON.stringify(result, null, 2) + '\n')}`);
+  if (flags.sarif) say(`SARIF:  ${write(flags.sarif, JSON.stringify(toSarif(result), null, 2) + '\n')}`);
 
-  process.exit(exitCode(result, { strict: flags.strict }));
+  if (updateBaseline) {
+    // A page that did not load has no findings, and saving that would hide its problems later.
+    if (result.totals.errors) fail(`the baseline was not written because ${plural(result.totals.errors, 'page')} could not be audited`);
+    const saved = baselineFile(result);
+    say(`Baseline: ${write(flags.baseline, JSON.stringify(saved, null, 2) + '\n')} (${plural(saved.findings.length, 'finding')} saved)`);
+    process.exit(0);
+  }
+  process.exit(comparison ? baselineExitCode(result, comparison, { strict: flags.strict }) : exitCode(result, { strict: flags.strict }));
 } catch (e) {
   if (e instanceof AccessReadyError) fail(e.message);
   throw e;

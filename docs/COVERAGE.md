@@ -4,15 +4,15 @@ What accessready does about each of the 86 level A and AA success criteria in WC
 
 | | Criteria | What it means |
 |---|---|---|
-| **Checked** | 31 | At least one automated check can fail a page on this. It never covers the whole criterion; the last column says what is left. |
-| **Listed for review** | 16 | Nothing is judged automatically, but the HTML report lists exactly what a person has to look at. |
-| **By hand** | 39 | No tool support. A person has to test it. |
+| **Checked** | 33 | At least one automated check can fail a page on this. It never covers the whole criterion; the last column says what is left. |
+| **Listed for review** | 15 | Nothing is judged automatically, but the HTML report lists exactly what a person has to look at. |
+| **By hand** | 36 | No tool support. A person has to test it. |
 
 No automated tool can establish that a site conforms to WCAG. This table is here so you can see what a clean run does and does not tell you.
 
 | Criterion | Level | Status | What is tested automatically | What a person still checks |
 |---|---|---|---|---|
-| 1.1.1 Non-text Content | A | Checked | Images, icons and image buttons that have no description at all. axe-core: `aria-meter-name`, `aria-progressbar-name`, `image-alt`, `input-image-alt`, `object-alt`, `role-img-alt`, `svg-img-alt`. | Whether each description says what the image is for. The report lists every image with its description. |
+| 1.1.1 Non-text Content | A | Checked | Images, icons and image buttons that have no description at all. Linked PDFs whose pages have pictures and no text at all, such as scans: an untagged one fails, a tagged one or one with only some scanned pages is flagged. axe-core: `aria-meter-name`, `aria-progressbar-name`, `image-alt`, `input-image-alt`, `object-alt`, `role-img-alt`, `svg-img-alt`. accessready: `pdf-image-only`. | Whether each description says what the image is for. The report lists every image with its description. |
 | 1.2.1 Audio-only and Video-only (Prerecorded) | A | Listed for review | Nothing. | Whether the transcript or description matches what is heard or seen. |
 | 1.2.2 Captions (Prerecorded) | A | Checked | Video elements with no caption track. axe-core: `video-caption`. | Whether captions are accurate and complete, not only present. |
 | 1.2.3 Audio Description or Media Alternative (Prerecorded) | A | Listed for review | Nothing. | Whether the description or text alternative covers everything shown that is not said. |
@@ -22,7 +22,7 @@ No automated tool can establish that a site conforms to WCAG. This table is here
 | 1.2.7 Extended Audio Description (Prerecorded) | AAA | Listed for review | Nothing. | Whether pauses for extended description are long enough. |
 | 1.2.8 Media Alternative (Prerecorded) | AAA | Listed for review | Nothing. | Whether the text alternative tells the whole story of the video. |
 | 1.2.9 Audio-only (Live) | AAA | By hand | Nothing. | Whether the live text alternative keeps up with the audio. |
-| 1.3.1 Info and Relationships | A | Checked | Broken list, table and ARIA structure. axe-core: `aria-hidden-body`, `aria-required-children`, `aria-required-parent`, `definition-list`, `dlitem`, `list`, `listitem`, `td-headers-attr`, `th-has-data-cells`. | Whether headings, lists and tables are marked up as what they look like. The report shows each page's heading outline. |
+| 1.3.1 Info and Relationships | A | Checked | Broken list, table and ARIA structure. Each PDF linked from an audited page is downloaded and read: one with no structure tree fails, one with tags that is not marked as tagged is flagged. axe-core: `aria-hidden-body`, `aria-required-children`, `aria-required-parent`, `definition-list`, `dlitem`, `list`, `listitem`, `td-headers-attr`, `th-has-data-cells`. accessready: `pdf-untagged`. | Whether headings, lists and tables are marked up as what they look like. The report shows each page's heading outline. |
 | 1.3.2 Meaningful Sequence | A | By hand | Nothing. | Whether the reading order makes sense in places the tool flags. |
 | 1.3.3 Sensory Characteristics | A | By hand | Nothing. | Instructions the tool flags: is there also a text label to go by. |
 | 1.3.4 Orientation | AA | By hand | Nothing. | Whether anything that does need one orientation (a piano app, a check deposit) is essential. |
@@ -32,7 +32,7 @@ No automated tool can establish that a site conforms to WCAG. This table is here
 | 1.4.2 Audio Control | A | Checked | Audio that plays by itself for more than three seconds with no way to stop it. axe-core: `no-autoplay-audio`. | Audio started by scripts in ways the tool did not trigger. |
 | 1.4.3 Contrast (Minimum) | AA | Checked | Text contrast on solid backgrounds. Text over images, gradients and video, measured from a screenshot with the text hidden. axe-core: `color-contrast`. accessready: `contrast-on-image`. | Text over an image that passes in some places and fails in others. The report lists each one with its measured range. |
 | 1.4.4 Resize Text | AA | Checked | Pages that block pinch-zoom. axe-core: `meta-viewport`. | Whether everything stays readable at 200% in the places the tool flags. |
-| 1.4.5 Images of Text | AA | Listed for review | Nothing. | Whether flagged images of text are logos or essential. |
+| 1.4.5 Images of Text | AA | Checked | Linked PDFs whose pages have pictures and no text at all, such as scans: an untagged one fails, a tagged one or one with only some scanned pages is flagged. accessready: `pdf-image-only`. | Whether flagged images of text are logos or essential. |
 | 1.4.6 Contrast (Enhanced) | AAA | Checked | Text contrast on solid backgrounds at the enhanced ratio. axe-core: `color-contrast-enhanced`. | Text over images at the enhanced ratio, where the measurement is mixed. |
 | 1.4.7 Low or No Background Audio | AAA | Listed for review | Nothing. | Whether speech in audio stands out from background sound by 20 decibels. |
 | 1.4.8 Visual Presentation | AAA | By hand | Nothing. | Whether users can choose their own colors, and text width at 200%. |
@@ -55,10 +55,10 @@ No automated tool can establish that a site conforms to WCAG. This table is here
 | 2.3.2 Three Flashes | AAA | By hand | Nothing. | Flashing in video that was not playing during the audit. |
 | 2.3.3 Animation from Interactions | AAA | By hand | Nothing. | Motion triggered by interactions the tool did not perform. |
 | 2.4.1 Bypass Blocks | A | Checked | Pages with no skip link, landmarks or headings to jump past repeated content. axe-core: `bypass`. | Whether the skip link lands on the main content. |
-| 2.4.2 Page Titled | A | Checked | Pages with no title. Different pages that share a title are noted. axe-core: `document-title`. accessready: `duplicate-title`. | Whether each title describes its page. |
+| 2.4.2 Page Titled | A | Checked | Pages with no title. Different pages that share a title are noted. Linked PDFs with no title in their document properties. Linked PDFs that have a title but are not set to display it (DisplayDocTitle). axe-core: `document-title`. accessready: `duplicate-title`, `pdf-no-title`, `pdf-title-hidden`. | Whether each title describes its page. |
 | 2.4.3 Focus Order | A | By hand | A dialog that opens without taking keyboard focus is noted. accessready: `dialog-focus`. | Whether the Tab order makes sense in the places the tool flags. |
 | 2.4.4 Link Purpose (In Context) | A | Checked | Links with no text at all. axe-core: `area-alt`, `link-name`. | Whether each link says where it goes in its context. The report lists links such as "click here" and "read more". |
-| 2.4.5 Multiple Ways | AA | By hand | Nothing. | Pages that are steps in a process, which are exempt. |
+| 2.4.5 Multiple Ways | AA | Flagged for a person | Across the pages audited and the sitemap, looks for a navigation menu, search, a site map page, a table of contents or A to Z index, and related links. A site of several pages with fewer than two of these is flagged. Pages that say they are a step in a process are left out. accessready: `multiple-ways`. | Pages that are steps in a process, which are exempt. |
 | 2.4.6 Headings and Labels | AA | Listed for review | Nothing. | Whether headings and labels describe what follows. The report shows each page's heading outline. |
 | 2.4.7 Focus Visible | AA | Checked | Every Tab stop is screenshotted focused and unfocused; if nothing on screen changes, it fails. Text fields whose only sign of focus is the text cursor are noted. accessready: `focus-visible`, `focus-caret-only`. | Focus indicators inside widgets the walk did not open. |
 | 2.4.8 Location | AAA | By hand | Nothing. | Whether the user can tell where they are in sites without breadcrumbs or a marked current page. |
@@ -75,7 +75,7 @@ No automated tool can establish that a site conforms to WCAG. This table is here
 | 2.5.6 Concurrent Input Mechanisms | AAA | By hand | Nothing. | Whether the site works with a mouse and a touch screen on the same device. |
 | 2.5.7 Dragging Movements | AA | By hand | Nothing. | Whether flagged drag features have a click or tap alternative. |
 | 2.5.8 Target Size (Minimum) | AA | Checked | Buttons and links smaller than 24 by 24 pixels with no spacing around them. axe-core: `target-size`. | Nothing further in most cases. |
-| 3.1.1 Language of Page | A | Checked | A missing or invalid page language. axe-core: `html-has-lang`, `html-lang-valid`, `html-xml-lang-mismatch`. | Whether the declared language is right where detection is unsure. |
+| 3.1.1 Language of Page | A | Checked | A missing or invalid page language. Linked PDFs with no language in the document catalog or on their tags. axe-core: `html-has-lang`, `html-lang-valid`, `html-xml-lang-mismatch`. accessready: `pdf-no-language`. | Whether the declared language is right where detection is unsure. |
 | 3.1.2 Language of Parts | AA | Checked | Invalid language codes on parts of a page. axe-core: `valid-lang`. | Passages in another language too short for detection. |
 | 3.1.3 Unusual Words | AAA | By hand | Nothing. | Whether flagged words are defined somewhere the user can find. |
 | 3.1.4 Abbreviations | AAA | By hand | Nothing. | Whether flagged abbreviations are expanded somewhere the user can find. |
@@ -84,9 +84,9 @@ No automated tool can establish that a site conforms to WCAG. This table is here
 | 3.2.1 On Focus | A | By hand | Nothing. | Changes of context on focus in widgets the walk did not open. |
 | 3.2.2 On Input | A | By hand | Nothing. | Changes the tool did not trigger, such as typing in a field. |
 | 3.2.3 Consistent Navigation | AA | Checked | The main navigation is compared across every page audited; a page that lists the same links in a different order fails. accessready: `inconsistent-navigation`. | Other repeated blocks, such as footers and sidebars. |
-| 3.2.4 Consistent Identification | AA | By hand | Nothing. | The same function labelled differently on different pages, beyond links. |
+| 3.2.4 Consistent Identification | AA | Flagged for a person | Links in the header, footer and navigation that go to the same place but are named differently on different pages, and search buttons and fields labelled differently from page to page. accessready: `inconsistent-identification`. | The same function labelled differently on different pages, beyond links. |
 | 3.2.5 Change on Request | AAA | Checked | Pages that refresh or redirect by themselves. axe-core: `meta-refresh-no-exceptions`. | Changes of context that happen without being asked for. |
-| 3.2.6 Consistent Help | A | By hand | Nothing. | Help mechanisms the tool does not recognize. |
+| 3.2.6 Consistent Help | A | Checked | Contact links, phone numbers, email links, help and FAQ links and chat widgets outside the main content are compared across pages; one that moves to the other side of the main content, or swaps order with another, fails. accessready: `inconsistent-help`. | Help mechanisms the tool does not recognize. |
 | 3.3.1 Error Identification | A | Listed for review | Nothing. | Errors that only the server reports, after a real submission. |
 | 3.3.2 Labels or Instructions | A | Checked | Fields with more than one label. axe-core: `form-field-multiple-labels`. | Whether labels and instructions are clear, including required formats. |
 | 3.3.3 Error Suggestion | AA | Listed for review | Nothing. | Whether error messages say how to fix the problem. |

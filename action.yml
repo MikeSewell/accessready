@@ -1,0 +1,196 @@
+name: accessready
+description: WCAG 2.2 audit for a whole site, in real Chrome. Writes HTML, JSON and SARIF reports and comments the summary on pull requests.
+author: Michael Sewell
+branding:
+  icon: check-circle
+  color: blue
+
+inputs:
+  url:
+    description: Site or page to audit, for example https://staging.example.org or http://localhost:3000. Can be left out when the config file sets "url".
+    required: false
+  paths:
+    description: Paths to audit, separated by spaces or new lines (for example "/ /donate"). Leave out to read the sitemap.
+    required: false
+  level:
+    description: WCAG level, A, AA or AAA. Leave out to use the config file or the default (AA).
+    required: false
+  args:
+    description: Any other accessready options, separated by spaces, for example "--viewports desktop --max 20".
+    required: false
+  config:
+    description: Path to an accessready.config.json, relative to the repository. Leave out to use ./accessready.config.json if there is one.
+    required: false
+  baseline:
+    description: Path to a baseline file. With one, only findings that are not in it fail the run.
+    required: false
+  comment:
+    description: On pull requests, post the summary as a comment, and update that comment on later runs.
+    required: false
+    default: 'true'
+  upload-sarif:
+    description: "Upload the SARIF file to GitHub code scanning. The job needs the permission security-events: write."
+    required: false
+    default: 'false'
+  artifact-name:
+    description: Name of the uploaded HTML report artifact.
+    required: false
+    default: accessready-report
+  node-version:
+    description: Node.js version to run accessready with (22 or newer).
+    required: false
+    default: '24'
+  github-token:
+    description: Token used to post the pull request comment.
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  exit-code:
+    description: "accessready's exit code: 0 no failures, 1 failures found, 2 the audit could not finish."
+    value: ${{ steps.audit.outputs.exit-code }}
+  html:
+    description: Path of the HTML report.
+    value: ${{ steps.audit.outputs.html }}
+  json:
+    description: Path of the JSON results.
+    value: ${{ steps.audit.outputs.json }}
+  sarif:
+    description: Path of the SARIF file.
+    value: ${{ steps.audit.outputs.sarif }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v7
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    # Installs accessready from the copy of this repository the workflow named in `uses:`,
+    # so the audit runs exactly the version of the tag or commit it points at.
+    - name: Install accessready
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: npm ci --omit=dev --no-audit --no-fund
+
+    # Inputs reach the script through environment variables, never pasted into it, so a path
+    # or argument cannot run as shell code. The exit code is saved rather than acted on, so
+    # the report is uploaded and the comment posted even when the audit fails.
+    - name: Audit
+      id: audit
+      shell: bash
+      env:
+        ACCESSREADY_BIN: ${{ github.action_path }}/bin/accessready.mjs
+        INPUT_URL: ${{ inputs.url }}
+        INPUT_PATHS: ${{ inputs.paths }}
+        INPUT_LEVEL: ${{ inputs.level }}
+        INPUT_ARGS: ${{ inputs.args }}
+        INPUT_CONFIG: ${{ inputs.config }}
+        INPUT_BASELINE: ${{ inputs.baseline }}
+        OUT: ${{ runner.temp }}/accessready
+      run: |
+        mkdir -p "$OUT"
+        args=()
+        if [ -n "$INPUT_URL" ]; then args+=("$INPUT_URL"); fi
+        read -r -d '' -a paths <<< "$INPUT_PATHS" || true
+        args+=("${paths[@]}")
+        if [ -n "$INPUT_LEVEL" ]; then args+=(--level "$INPUT_LEVEL"); fi
+        if [ -n "$INPUT_CONFIG" ]; then args+=(--config "$INPUT_CONFIG"); fi
+        if [ -n "$INPUT_BASELINE" ]; then args+=(--baseline "$INPUT_BASELINE"); fi
+        read -r -d '' -a extra <<< "$INPUT_ARGS" || true
+        args+=("${extra[@]}")
+        set +e
+        node "$ACCESSREADY_BIN" "${args[@]}" --html "$OUT/accessready.html" --json "$OUT/accessready.json" --sarif "$OUT/accessready.sarif"
+        code=$?
+        set -e
+        {
+          echo "exit-code=$code"
+          echo "html=$OUT/accessready.html"
+          echo "json=$OUT/accessready.json"
+          echo "sarif=$OUT/accessready.sarif"
+          # hashFiles() only sees the workspace, so later steps check these instead.
+          if [ -f "$OUT/accessready.html" ]; then echo "has-html=true"; fi
+          if [ -f "$OUT/accessready.sarif" ]; then echo "has-sarif=true"; fi
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Upload the HTML report
+      if: always() && steps.audit.outputs.has-html == 'true'
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: ${{ runner.temp }}/accessready/accessready.html
+
+    - name: Upload SARIF to code scanning
+      if: always() && inputs.upload-sarif == 'true' && steps.audit.outputs.has-sarif == 'true'
+      uses: github/codeql-action/upload-sarif@v4
+      with:
+        sarif_file: ${{ runner.temp }}/accessready/accessready.sarif
+        category: accessready
+
+    # One comment per pull request, found again by the hidden marker and edited, so a busy
+    # pull request does not collect a comment per push. The same summary goes on the run's
+    # summary page whether or not there is a pull request.
+    - name: Summarize
+      if: always() && steps.audit.outputs.json != ''
+      uses: actions/github-script@v7
+      env:
+        RESULT: ${{ steps.audit.outputs.json }}
+        EXIT_CODE: ${{ steps.audit.outputs.exit-code }}
+        COMMENT: ${{ inputs.comment }}
+        ARTIFACT: ${{ inputs.artifact-name }}
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const fs = require('fs');
+          const MARKER = '<!-- accessready-report -->';
+          const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+          let body;
+          if (!fs.existsSync(process.env.RESULT)) {
+            body = `${MARKER}\n### accessready\n\nThe audit could not finish (exit code ${process.env.EXIT_CODE}). See the [run log](${runUrl}).`;
+          } else {
+            const r = JSON.parse(fs.readFileSync(process.env.RESULT, 'utf8'));
+            const t = r.totals;
+            const n = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`;
+            const verdict = t.errors ? `${n(t.errors, 'page')} could not be audited`
+              : r.baseline ? (r.baseline.new.some((f) => f.kind === 'failure') ? `${n(r.baseline.new.filter((f) => f.kind === 'failure').length, 'new failure')}` : 'No new failures')
+              : t.failures ? n(t.failures, `${r.standard} failure`) : `No automated ${r.standard} failures`;
+            const lines = [MARKER, `### accessready: ${verdict}`, '', `${r.target}, ${n(t.pages, 'page')} (${r.discovery}; ${r.viewports.join(', ')})`, ''];
+            lines.push('| Failures | Likely problems | Best-practice notes | For a person to check |', '|---|---|---|---|', `| ${t.failures} | ${t.likely} | ${t.advice} | ${t.needsReview} |`, '');
+            if (r.baseline) lines.push(`Baseline: ${r.baseline.known} known, ${r.baseline.new.length} new, ${r.baseline.fixed.length} fixed.`, '');
+            if (r.ignored?.length) lines.push(`${n(r.ignored.length, 'finding')} ignored by the config file, each with a reason (listed in the JSON results).`, '');
+            const byRule = new Map();
+            for (const p of r.pages) for (const i of p.issues) {
+              if (i.kind !== 'failure' || (r.baseline && i.baseline !== 'new')) continue;
+              const row = byRule.get(i.id) || { title: i.title, wcag: i.wcag, count: 0, pages: new Set() };
+              row.count++; row.pages.add(new URL(p.url).pathname);
+              byRule.set(i.id, row);
+            }
+            if (byRule.size) {
+              lines.push(r.baseline ? '**New failures**' : '**Failures by rule**', '', '| Rule | WCAG | Places | Pages |', '|---|---|---|---|');
+              const esc = (s) => String(s).replace(/[|<>]/g, (c) => `&#${c.charCodeAt(0)};`);
+              for (const [id, row] of [...byRule].sort((a, b) => b[1].count - a[1].count).slice(0, 15)) {
+                lines.push(`| ${esc(row.title)} (\`${id}\`) | ${row.wcag.join(', ') || 'best practice'} | ${row.count} | ${esc([...row.pages].slice(0, 3).join(', '))}${row.pages.size > 3 ? ` and ${row.pages.size - 3} more` : ''} |`);
+              }
+              lines.push('');
+            }
+            lines.push(`The full report is the \`${process.env.ARTIFACT}\` artifact on [this run](${runUrl}). Automated checks find some accessibility problems, not all of them.`);
+            body = lines.join('\n');
+          }
+          await core.summary.addRaw(body).write();
+          if (process.env.COMMENT !== 'true' || !context.payload.pull_request) return;
+          const issue_number = context.payload.pull_request.number;
+          try {
+            const comments = await github.paginate(github.rest.issues.listComments, { ...context.repo, issue_number, per_page: 100 });
+            const mine = comments.find((c) => c.body && c.body.includes(MARKER));
+            if (mine) await github.rest.issues.updateComment({ ...context.repo, comment_id: mine.id, body });
+            else await github.rest.issues.createComment({ ...context.repo, issue_number, body });
+          } catch (e) {
+            // Pull requests from forks get a read-only token; the run summary still has it all.
+            core.warning(`accessready could not comment on the pull request: ${e.message}`);
+          }
+
+    - name: Exit with accessready's status
+      shell: bash
+      env:
+        EXIT_CODE: ${{ steps.audit.outputs.exit-code }}
+      run: exit "${EXIT_CODE:-2}"
