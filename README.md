@@ -4,13 +4,13 @@
 
 [![npm](https://img.shields.io/npm/v/accessready.svg)](https://www.npmjs.com/package/accessready)
 [![CI](https://github.com/MikeSewell/accessready/actions/workflows/ci.yml/badge.svg)](https://github.com/MikeSewell/accessready/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/MikeSewell/accessready/blob/main/LICENSE)
 
 ```sh
 npx accessready https://example.org
 ```
 
-![accessready reporting a link with no focus indicator, a hover-only menu, a keyboard trap and text too faint over an image](docs/terminal.png)
+![accessready reporting a link with no focus indicator, a hover-only menu, a keyboard trap and text too faint over an image](https://raw.githubusercontent.com/MikeSewell/accessready/main/docs/terminal.png)
 
 It reads the sitemap, audits every page, and exits 1 if anything fails, so it can gate a deploy.
 
@@ -46,7 +46,7 @@ As of axe-core 4.14, it has no rule for focus visibility, hidden focus, keyboard
 | 21 | need a person, with no help from the tool |
 <!-- coverage:end -->
 
-Every criterion, what is tested and what is left to a person: [docs/COVERAGE.md](docs/COVERAGE.md). The table is generated from the code and checked on every commit.
+Every criterion, what is tested and what is left to a person: [docs/COVERAGE.md](https://github.com/MikeSewell/accessready/blob/main/docs/COVERAGE.md). The table is generated from the code and checked on every commit.
 
 For the part no tool can judge, the HTML report gives you a worklist instead of a warning: every image with its description beside it, every video, every form, every "click here" link, and each page's heading outline.
 
@@ -132,9 +132,9 @@ accessready https://example.org --html report.html
 
 One file, written for the person who owns the site as much as the developer who fixes it. Problems are grouped by kind, with a plain explanation of who each one affects. Below them is the worklist of what to check by hand.
 
-![The HTML report: a summary, then each kind of problem with where it happens](docs/report.png)
+![The HTML report: a summary, then each kind of problem with where it happens](https://raw.githubusercontent.com/MikeSewell/accessready/main/docs/report.png)
 
-![The worklist: each image with its description, vague links, forms and text over images](docs/worklist.png)
+![The worklist: each image with its description, vague links, forms and text over images](https://raw.githubusercontent.com/MikeSewell/accessready/main/docs/worklist.png)
 
 The report passes its own audit. That is tested on every commit.
 
@@ -220,7 +220,7 @@ This is background, not legal advice.
 
 ## Contributing
 
-Bug reports and pull requests are welcome, especially false positives: a page where accessready reports something a person wouldn't. See [CONTRIBUTING.md](CONTRIBUTING.md).
+Bug reports and pull requests are welcome, especially false positives: a page where accessready reports something a person wouldn't. See [CONTRIBUTING.md](https://github.com/MikeSewell/accessready/blob/main/CONTRIBUTING.md).
 
 ## Who builds this
 
@@ -228,4 +228,4 @@ accessready is built by [Michael Sewell](https://msewell.com). It started as the
 
 ## License
 
-[MIT](LICENSE). axe-core is used unmodified under the [Mozilla Public License 2.0](https://github.com/dequelabs/axe-core/blob/develop/LICENSE).
+[MIT](https://github.com/MikeSewell/accessready/blob/main/LICENSE). axe-core is used unmodified under the [Mozilla Public License 2.0](https://github.com/dequelabs/axe-core/blob/develop/LICENSE).

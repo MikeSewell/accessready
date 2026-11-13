@@ -24,4 +24,12 @@ jobs:
       - run: npm install -g npm@latest
       - run: npm ci
       - run: npm test
-      - run: npm publish --access public
+      # The first version was published by hand, before trusted publishing could be set up.
+      - name: Skip if this version is already on npm
+        id: published
+        run: |
+          if npm view "$(node -p 'require("./package.json").name')@$(node -p 'require("./package.json").version')" version >/dev/null 2>&1; then
+            echo "already=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.published.outputs.already != 'true'
+        run: npm publish --access public
