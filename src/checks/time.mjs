@@ -446,6 +446,13 @@ async function checkMotion(page, ctx) {
   const knownPopups = new Set(first.popups.map((p) => p.id));
   const timeline = [];
   let gone = null;
+  // When the page left is read from the page's own clock, measured from when it loaded, at the
+  // middle of the step in which it left: the steps are 30 seconds, and the clock also runs
+  // between them while the other parts of this check look at the page.
+  const clock = () => page.evaluate(() => Date.now()).catch(() => null);
+  const loadedAt = await page.evaluate(() => Date.now() - performance.now()).catch(() => null);
+  let step = null;
+  const leftAt = () => (step && loadedAt !== null ? (step.from + step.to) / 2 - loadedAt : elapsed);
 
   // The page has gone when its document has been replaced: a reload, or a new address. A
   // script that only rewrites the address bar (a slide number in the hash) has not.
@@ -455,7 +462,7 @@ async function checkMotion(page, ctx) {
       await page.waitForLoadState('load', { timeout: 5000 }).catch(() => {});
       s = await page.evaluate(pageSignals, signals).catch(() => null);
       if (!s || !s.marker) {
-        gone = { at: elapsed, reload: page.url() === startUrl };
+        gone = { at: leftAt(), reload: page.url() === startUrl };
         return null;
       }
     }
@@ -463,7 +470,13 @@ async function checkMotion(page, ctx) {
     for (const p of s.popups) knownPopups.add(p.id);
     return s;
   };
-  const forward = async (ms) => { await page.clock.fastForward(ms); elapsed += ms; };
+  const forward = async (ms) => {
+    const from = await clock();
+    await page.clock.fastForward(ms);
+    elapsed += ms;
+    const to = await clock();
+    step = from === null ? null : { from, to: to ?? from + ms };
+  };
 
   // 3. Parts of the page that change by themselves.
   await page.evaluate(startWatch);
