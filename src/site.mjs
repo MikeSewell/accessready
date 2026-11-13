@@ -15,7 +15,11 @@ function navigationOrder(pages) {
     tally.set(key, (tally.get(key) || 0) + 1);
   }
   const reference = JSON.parse([...tally.entries()].sort((a, b) => b[1] - a[1])[0][0]);
-  const position = new Map(reference.map((label, i) => [label, i]));
+  // Where each label first appears. A menu can list a label twice (a Donate link and a
+  // Donate button at the end), and `shared` below keeps first occurrences too, so both sides
+  // have to count from the same one or an unchanged menu reads as reordered.
+  const position = new Map();
+  reference.forEach((label, i) => { if (!position.has(label)) position.set(label, i); });
 
   for (const p of withNav) {
     const shared = [...new Set(p.review.nav)].filter((label) => position.has(label));

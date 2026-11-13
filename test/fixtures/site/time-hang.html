@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A page that freezes after ten minutes</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>A page that freezes after ten minutes</h1>
+  <p>Ten minutes after it loads, a script on this page runs forever and the page stops responding. The clock check moves time on to twenty minutes, so it reaches that point.</p>
+</main>
+<script>
+  setTimeout(() => { for (;;) {} }, 600000);
+</script>
+</body>
+</html>

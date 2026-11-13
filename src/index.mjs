@@ -114,16 +114,35 @@ async function timed(result, name, fn) {
   try { return await fn(); } finally { result.timings[name] = (result.timings[name] || 0) + Date.now() - start; }
 }
 
+// How long one check may run on one page before it is stopped. The slowest checks on the
+// test fixtures (the clock check and the resize check, each including the page load of its
+// own copy) take about 13 seconds; a real page with more on it takes longer. Three minutes
+// leaves room for a slow site and still ends a check that will never finish, such as the
+// clock check on a page whose script locks up once the clock passes ten minutes.
+export const CHECK_TIMEOUT = 180_000;
+const LATE = Symbol('late');
+
 // Runs one check and returns what it found, { issues, notes }, so checks that run at the same
-// time can still be added to the result in a fixed order.
-async function runProbe(probe, page, ctx, result) {
+// time can still be added to the result in a fixed order. A check still running after
+// `deadline` ms is left behind: `onLate()` closes what it was working on, and the audit
+// carries on with a note naming it.
+async function runProbe(probe, page, ctx, result, { deadline = CHECK_TIMEOUT, onLate = null } = {}) {
   const start = Date.now();
+  let timer;
   try {
-    const out = await probe.run(page, ctx);
+    const running = Promise.resolve().then(() => probe.run(page, ctx));
+    // Once left behind, the check fails as soon as its page is closed. Nobody waits for it then.
+    running.catch(() => {});
+    const out = await Promise.race([running, new Promise((done) => { timer = setTimeout(done, deadline, LATE); })]);
+    if (out === LATE) {
+      await onLate?.();
+      return { issues: [], notes: [`the ${probe.name} check was stopped after ${Math.round(deadline / 1000)} seconds, its time limit; what it would have found on this page is not in the report`], late: true };
+    }
     return { issues: Array.isArray(out) ? out : out?.issues || [], notes: out?.notes || [] };
   } catch (e) {
     return { issues: [], notes: [`the ${probe.name} check could not finish: ${String(e.message).split('\n')[0]}`], crashed: /Target crashed|Target page, context or browser has been closed/i.test(String(e.message)) };
   } finally {
+    clearTimeout(timer);
     result.timings[probe.name] = (result.timings[probe.name] || 0) + Date.now() - start;
   }
 }
@@ -183,6 +202,15 @@ async function auditPage(browser, url, viewport, opts) {
     };
     const probeCtx = { url, level: opts.level, viewport, browserName: engine, opts, result, fresh };
     const probes = (phase) => PROBES.filter((p) => p.phase === phase && (!p.browsers || p.browsers.includes(engine)));
+    // audit({ checkTimeout }) changes the limit, for a very slow site and for the tests.
+    const deadline = opts.checkTimeout || CHECK_TIMEOUT;
+    // Each check gets the shared context with a `fresh` of its own, so the copies it opens
+    // are known and can be closed if it runs past its deadline.
+    const forProbe = () => {
+      const opened = [];
+      const own = async (o) => { const p = await fresh(o); opened.push(p); return p; };
+      return { ctx: { ...probeCtx, fresh: own }, closeOpened: () => Promise.all(opened.map((p) => p.context().close().catch(() => {}))) };
+    };
     // Checks on the page itself run one after another. Checks that get their own copy cannot
     // affect each other, so up to ISOLATED_AT_ONCE of them run at the same time; their findings
     // are still added in the order the checks are listed.
@@ -190,6 +218,14 @@ async function auditPage(browser, url, viewport, opts) {
       const list = probes(phase);
       const outputs = new Array(list.length);
       const isolated = list.map((probe, i) => ({ probe, i })).filter(({ probe }) => probe.isolated || probe.clock);
+      // A check on its own copy that runs too long takes only that copy with it.
+      const runIsolated = async (probe, p) => {
+        const { ctx, closeOpened } = forProbe();
+        const out = await runProbe(probe, p, ctx, result, { deadline, onLate: () => Promise.all([p.context().close().catch(() => {}), closeOpened()]) });
+        await p.context().close().catch(() => {});
+        await closeOpened();
+        return out;
+      };
       let next = 0;
       const worker = async () => {
         for (let k = next++; k < isolated.length; k = next++) {
@@ -199,24 +235,36 @@ async function auditPage(browser, url, viewport, opts) {
             outputs[i] = { issues: [], notes: [`the ${probe.name} check could not open the page again: ${String(e.message).split('\n')[0]}`] };
             continue;
           }
-          outputs[i] = await runProbe(probe, p, probeCtx, result);
-          await p.context().close().catch(() => {});
+          outputs[i] = await runIsolated(probe, p);
           // A renderer that crashed under load takes its page with it. Try once more on a new copy.
           if (outputs[i].crashed) {
             const again = await timed(result, probe.name, () => fresh({ clock: !!probe.clock, reducedMotion: probe.reducedMotion })).catch(() => null);
-            if (again) {
-              outputs[i] = await runProbe(probe, again, probeCtx, result);
-              await again.context().close().catch(() => {});
-            }
+            if (again) outputs[i] = await runIsolated(probe, again);
           }
         }
       };
       const running = Promise.all(Array.from({ length: Math.min(ISOLATED_AT_ONCE, isolated.length) }, worker));
+      let frozen = null;
       for (const [i, probe] of list.entries()) {
-        if (!(probe.isolated || probe.clock)) outputs[i] = await runProbe(probe, page, probeCtx, result);
+        if (probe.isolated || probe.clock) continue;
+        // A check on the page itself that runs too long: the copies it opened are closed. If
+        // the page itself no longer answers, nothing after it can be measured, so this view of
+        // the page ends with an error that names the check.
+        const { ctx, closeOpened } = forProbe();
+        outputs[i] = await runProbe(probe, page, ctx, result, {
+          deadline,
+          onLate: async () => {
+            await closeOpened();
+            const answers = await Promise.race([page.evaluate(() => true).catch(() => false), new Promise((done) => setTimeout(done, 5000, false))]);
+            if (!answers) { frozen = probe.name; await context.close().catch(() => {}); }
+          },
+        });
+        if (frozen) break;
       }
       await running;
+      if (frozen) throw new Error(`the page stopped responding during the ${frozen} check, which was stopped after ${Math.round(deadline / 1000)} seconds`);
       for (const out of outputs) {
+        if (!out) continue;
         result.issues.push(...out.issues);
         result.notes.push(...out.notes);
       }

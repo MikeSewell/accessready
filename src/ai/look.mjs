@@ -6,6 +6,7 @@
 // Every rule here is a judgment about wording and meaning that no rule engine can make, so
 // each one is `likely`: a person confirms it. `source: 'ai'` tells src/coverage.mjs to count
 // it as AI review rather than as a machine check.
+import { cappedGet } from '../download.mjs';
 
 export const rules = {
   'ai-image-alt': {
@@ -72,6 +73,7 @@ export const LIMITS = { text: 6000, links: 60, headings: 40, fields: 30, images:
 // and each picture costs a few hundred tokens instead of thousands.
 const PICTURE_EDGE = 768;
 const PICTURE_BYTES = 1_500_000;
+const PICTURE_TIMEOUT = 10000;
 const PICTURE_TOTAL = 6_000_000; // base64 characters across one page's pictures
 const PICTURE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
@@ -237,13 +239,15 @@ function collect({ limits, edge, pictures }) {
   return { title: clean(document.title), lang: document.documentElement.lang || '', h1: clean(document.querySelector('h1')?.innerText).slice(0, 150), text, images, links, headings, fields, buttons };
 }
 
-async function fetchPicture(page, src) {
+// A picture the page could not hand over is downloaded with the page's cookies, read as it
+// arrives and dropped at PICTURE_BYTES: a server that sends far more than that, or a small
+// compressed body that expands to far more, never fills memory.
+async function fetchPicture(page, src, proxy) {
   try {
-    const res = await page.context().request.get(src, { timeout: 10000 });
-    const type = (res.headers()['content-type'] || '').split(';')[0].trim().toLowerCase();
-    if (!res.ok() || !PICTURE_TYPES.includes(type)) return null;
-    const body = await res.body();
-    return body.length <= PICTURE_BYTES ? { mediaType: type, data: body.toString('base64') } : null;
+    const res = await cappedGet(page.context(), src, { maxBytes: PICTURE_BYTES, timeout: PICTURE_TIMEOUT, proxy });
+    const type = (res.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+    if (res.status >= 300 || !PICTURE_TYPES.includes(type)) return null;
+    return { mediaType: type, data: res.body.toString('base64') };
   } catch {
     return null;
   }
@@ -261,7 +265,7 @@ async function lookForAi(page, ctx) {
   let bytes = look.images.reduce((n, i) => n + (i.picture?.data.length || 0), 0);
   for (const image of look.images) {
     if (image.fetch && bytes < PICTURE_TOTAL) {
-      image.picture = await fetchPicture(page, image.src);
+      image.picture = await fetchPicture(page, image.src, ctx.opts.proxy);
       if (image.picture && (bytes += image.picture.data.length) > PICTURE_TOTAL) image.picture = null;
     }
     delete image.fetch;

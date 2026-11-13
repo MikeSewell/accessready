@@ -4,12 +4,35 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
+import { gzipSync } from 'node:zlib';
 import { audit } from '../src/index.mjs';
 import { startSite } from './helpers.mjs';
 
 const UNTAGGED = readFileSync(new URL('./fixtures/site/docs/untagged.pdf', import.meta.url));
-let site, other, result, crossHost, edgeCases;
+let site, other, result, crossHost, edgeCases, oversized, peakGrowth;
 const requests = [];
+// Bytes the server that ignores Range managed to send before the download was dropped.
+const streamed = { sent: 0, closed: false };
+const MB = 1024 * 1024;
+// 400 MB of zeros as 400 one-megabyte gzip members, back to back: a valid gzip body of about
+// 400 KB, made in a moment.
+const BOMB = Buffer.concat(Array(400).fill(gzipSync(Buffer.alloc(MB))));
+
+// Sends 100 MB in answer to any request, Range or not, as fast as the reader takes it.
+function sendForever(res) {
+  res.writeHead(200, { 'content-type': 'application/pdf' });
+  const chunk = Buffer.alloc(64 * 1024, 0x20);
+  chunk.write('%PDF-1.4\n');
+  res.on('close', () => { streamed.closed = true; });
+  const pump = () => {
+    while (streamed.sent < 100 * MB && !res.destroyed) {
+      streamed.sent += chunk.length;
+      if (!res.write(chunk)) return res.once('drain', pump);
+    }
+    if (!res.destroyed) res.end();
+  };
+  pump();
+}
 
 // A second host, for PDFs a site keeps somewhere else. It records every request it gets.
 async function startOther() {
@@ -18,6 +41,8 @@ async function startOther() {
     if (req.url === '/handbook.pdf') { res.writeHead(200, { 'content-type': 'application/pdf' }); return res.end(UNTAGGED); }
     // Answers the Range request with a slice of a file far over the size cap.
     if (req.url === '/huge.pdf') { res.writeHead(206, { 'content-type': 'application/pdf', 'content-range': 'bytes 0-99/999999999' }); return res.end(UNTAGGED.subarray(0, 100)); }
+    if (req.url === '/no-range.pdf') return sendForever(res);
+    if (req.url === '/bomb.pdf') { res.writeHead(200, { 'content-type': 'application/pdf', 'content-encoding': 'gzip' }); return res.end(BOMB); }
     if (req.url === '/login.pdf') { res.writeHead(200, { 'content-type': 'text/html' }); return res.end('<!doctype html><title>Sign in</title>'); }
     res.writeHead(404); res.end();
   });
@@ -33,11 +58,19 @@ before(async () => {
   site = await startSite({
     '/elsewhere.html': page(`<a href="${other.origin}/handbook.pdf">Volunteer handbook (PDF)</a>`),
     '/edge.html': page(`<a href="${other.origin}/huge.pdf">Archive (PDF)</a>, <a href="${other.origin}/login.pdf">Members only (PDF)</a>`),
+    '/oversized.html': page(`<a href="${other.origin}/no-range.pdf">Annual report (PDF)</a>, <a href="${other.origin}/bomb.pdf">Minutes (PDF)</a>`),
   });
   result = await audit(site.origin, { viewports: ['desktop'], paths: ['/site-docs.html', '/site-docs-2.html'] });
   // Both screen sizes, to show each PDF is still downloaded only once.
   crossHost = await audit(`${site.origin}/elsewhere.html`, { viewports: ['desktop', 'phone'] });
   edgeCases = await audit(`${site.origin}/edge.html`, { viewports: ['desktop'] });
+  // Memory is sampled while the oversized files are fetched: reading either one whole would
+  // add hundreds of megabytes to this process.
+  const base = process.memoryUsage().rss;
+  let peak = base;
+  const sampler = setInterval(() => { peak = Math.max(peak, process.memoryUsage().rss); }, 20);
+  try { oversized = await audit(`${site.origin}/oversized.html`, { viewports: ['desktop'] }); } finally { clearInterval(sampler); }
+  peakGrowth = peak - base;
 });
 after(async () => { await site.close(); await other.close(); });
 
@@ -95,4 +128,17 @@ test('files over the size cap and links that return a web page are skipped with 
     `the PDF ${other.origin}/login.pdf could not be checked: the link returned a web page, not a PDF (a login page or an error page?)`,
   ]);
   assert.ok(p.notes.some((n) => n.endsWith(host)));
+});
+
+test('a server that ignores Range, and a small gzip body that expands to 400 MB, are dropped at the cap', () => {
+  const p = oversized.pages[0];
+  assert.deepEqual(p.issues, []);
+  assert.deepEqual(p.notes.filter((n) => n.startsWith('the PDF')), [
+    `the PDF ${other.origin}/no-range.pdf could not be checked: it is larger than 20 MB`,
+    `the PDF ${other.origin}/bomb.pdf could not be checked: it is larger than 20 MB`,
+  ]);
+  // The connection was closed soon after the cap, not read to the end of its 100 MB.
+  assert.ok(streamed.closed, 'the download was stopped');
+  assert.ok(streamed.sent < 50 * MB, `${Math.round(streamed.sent / MB)} MB were sent`);
+  assert.ok(peakGrowth < 150 * MB, `memory grew by ${Math.round(peakGrowth / MB)} MB`);
 });

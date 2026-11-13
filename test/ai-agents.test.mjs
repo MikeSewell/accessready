@@ -30,10 +30,22 @@ let stdin = '';
 process.stdin.on('data', (d) => { stdin += d; });
 process.stdin.on('end', () => {
   const cwd = process.cwd();
-  const files = fs.readdirSync(cwd).map((f) => ({ name: f, head: fs.readFileSync(path.join(cwd, f)).subarray(0, 2).toString('hex') }));
-  fs.appendFileSync(process.env.FAKE_LOG, JSON.stringify({ bin: BIN, args, cwd, stdin, files, pid: process.pid }) + '\n');
+  const read = (f) => { try { return fs.readFileSync(f, 'utf8'); } catch { return null; } };
+  const files = fs.readdirSync(cwd).map((f) => (fs.statSync(path.join(cwd, f)).isDirectory()
+    ? { name: f, dir: fs.readdirSync(path.join(cwd, f)) }
+    : { name: f, head: fs.readFileSync(path.join(cwd, f)).subarray(0, 2).toString('hex') }));
+  const policy = args.includes('--policy') ? read(args[args.indexOf('--policy') + 1]) : null;
+  const settings = read(path.join(cwd, '.gemini', 'settings.json'));
   const mode = process.env.FAKE_MODE;
-  if (mode === 'hang') return setTimeout(() => {}, 600000);
+  // A helper in a process group of its own that inherits stdout and outlives the tool, the
+  // way a language server or telemetry uploader started by a CLI can.
+  let helper = null;
+  if (mode === 'helper' || mode === 'helper-hang') {
+    helper = require('child_process').spawn(process.execPath, ['-e', 'setTimeout(() => {}, 600000)'], { detached: true, stdio: ['ignore', 'inherit', 'inherit'] });
+    helper.unref();
+  }
+  fs.appendFileSync(process.env.FAKE_LOG, JSON.stringify({ bin: BIN, args, cwd, stdin, files, policy, settings, trust: process.env.GEMINI_CLI_TRUST_WORKSPACE || null, pid: process.pid, helper: helper && helper.pid }) + '\n');
+  if (mode === 'hang' || mode === 'helper-hang') return setTimeout(() => {}, 600000);
   if (mode === 'fail') { process.stderr.write('Error: not logged in. Run the CLI once to log in.\n'); process.exit(3); }
   if (mode === 'garbage') { process.stdout.write('Welcome! Tip of the day: try the new themes.\n'); return; }
   const prompt = BIN === 'claude' ? JSON.parse(stdin).message.content[0].text : stdin;
@@ -117,20 +129,34 @@ test('codex: exec in a read-only sandbox, shell off, images as files in its own 
   assert.deepEqual(aiFindings(r.pages[0]), [['ai-image-alt', '#bad']]);
 });
 
-test('gemini-cli: plan mode, JSON output, prompt on stdin, text only with a note', async () => {
+test('gemini-cli: plan mode, no extensions, no MCP servers, no tools, no context files; JSON output, prompt on stdin, text only with a note', async () => {
   const r = await run(['ai-image'], 'gemini-cli:test-model');
   const [call] = logged();
-  assert.deepEqual(call.args, ['--approval-mode', 'plan', '--output-format', 'json', '-m', 'test-model', '-p', INSTRUCTION]);
+  const cwd = dirname(call.args[call.args.indexOf('--policy') + 1]);
+  assert.match(cwd, /accessready-ai-/);
+  assert.deepEqual(call.args, ['--approval-mode', 'plan', '--extensions', 'none', '--allowed-mcp-server-names', 'accessready-allows-no-mcp-server',
+    '--policy', join(cwd, 'no-tools.toml'), '--output-format', 'json', '-m', 'test-model', '-p', INSTRUCTION]);
+  // A policy that denies every tool, and project settings that load no GEMINI.md, skills,
+  // hooks or memory, in a folder trusted for this run only.
+  assert.match(call.policy, /^\[\[rule\]\]\ntoolName = "\*"\ndecision = "deny"\npriority = 999$/m);
+  assert.deepEqual(JSON.parse(call.settings), {
+    context: { fileName: 'accessready-reads-no-context-file.md', includeDirectoryTree: false, memoryBoundaryMarkers: ['.gemini'] },
+    mcp: { allowed: ['accessready-allows-no-mcp-server'] }, skills: { enabled: false }, hooksConfig: { enabled: false }, experimental: { autoMemory: false },
+  });
+  assert.equal(call.trust, 'true');
+  assert.deepEqual(call.files, [{ name: '.gemini', dir: ['settings.json'] }, { name: 'no-tools.toml', head: '2320' }]);
   assert.doesNotMatch(call.stdin, /base64|\/9j\//);
   assert.match(call.stdin, /"alt":"IMG_2041\.jpg"/);
   assert.deepEqual(aiFindings(r.pages[0]), [['ai-image-alt', '#bad']]);
   assert.deepEqual(notesOf(r), ['AI review: images were not sent, because gemini-cli has no documented way to take them in non-interactive mode; image descriptions were judged by their words and nearby text only']);
 });
 
-test('qwen-code: plan mode, the result message read from its JSON array', async () => {
+test('qwen-code: safe mode, plan mode, no tool calls; the result message read from its JSON array', async () => {
   const r = await run(['ai-link'], 'qwen-code');
   const [call] = logged();
-  assert.deepEqual(call.args, ['--approval-mode', 'plan', '--output-format', 'json', '-p', INSTRUCTION]);
+  assert.deepEqual(call.args, ['--safe-mode', '--approval-mode', 'plan', '--max-tool-calls', '0', '--output-format', 'json', '-p', INSTRUCTION]);
+  assert.equal(call.trust, null);
+  assert.deepEqual(call.files, [], 'it runs in an empty folder');
   assert.equal(call.bin, 'qwen');
   assert.deepEqual(aiFindings(r.pages[0]), [['ai-link-purpose', '#vague']]);
   assert.deepEqual(r.ai.usage, { inputTokens: 900, outputTokens: 40 });
@@ -171,6 +197,54 @@ test('a CLI that does not answer in time is stopped, and the audit carries on', 
   assert.deepEqual(notesOf(r), ['AI review: the request did not succeed (codex gave no answer within 2 seconds); nothing was reported']);
   assert.throws(() => process.kill(call.pid, 0), /ESRCH/, 'the hung process was stopped');
   assert.equal(r.pages[0].error, null);
+});
+
+test('a CLI that exits while a helper it started holds stdout open is read once it exits', { timeout: 30000 }, async () => {
+  const started = Date.now();
+  const r = await run(['ai-image'], 'claude-code', { mode: 'helper' });
+  const [call] = logged();
+  try {
+    assert.ok(Date.now() - started < 20000, 'the review did not wait for the helper');
+    assert.deepEqual(aiFindings(r.pages[0]), [['ai-image-alt', '#bad']]);
+    assert.deepEqual(notesOf(r), []);
+  } finally {
+    try { process.kill(call.helper, 'SIGKILL'); } catch { /* gone */ }
+  }
+});
+
+test('the time limit holds when a helper keeps stdout open after the CLI is stopped', { timeout: 30000 }, async () => {
+  const r = await run(['ai-clean'], 'codex', { mode: 'helper-hang', timeout: 2000 });
+  const [call] = logged();
+  try {
+    assert.deepEqual(notesOf(r), ['AI review: the request did not succeed (codex gave no answer within 2 seconds); nothing was reported']);
+    assert.throws(() => process.kill(call.pid, 0), /ESRCH/, 'the hung CLI was stopped');
+    assert.equal(r.pages[0].error, null);
+  } finally {
+    try { process.kill(call.helper, 'SIGKILL'); } catch { /* gone */ }
+  }
+});
+
+for (const [signal, code] of [['SIGINT', 130], ['SIGTERM', 143]]) test(`${signal === 'SIGINT' ? 'Ctrl-C' : 'SIGTERM'} during the review stops the CLI, removes its folder and exits ${code}`, { timeout: 60000 }, async () => {
+  rmSync(log, { force: true });
+  const child = spawn(process.execPath, [BIN, `${site.origin}/ai-clean.html`, '--viewports', 'desktop', '--ai', 'codex', '--ai-no-cache', '--json', '-'],
+    { env: { NO_COLOR: '1', ...envFor('hang'), HOME: process.env.HOME }, cwd: dir, stdio: 'ignore' });
+  const exited = new Promise((done) => child.on('exit', (code, signal) => done({ code, signal })));
+  // Wait for the fake CLI to start, then send the signal to accessready alone, the way a
+  // terminal's Ctrl-C reaches the foreground process group the CLI is no longer part of.
+  let call;
+  for (let waited = 0; !(call = entries()[0]) && waited < 45000; waited += 100) await new Promise((done) => setTimeout(done, 100));
+  try {
+    assert.ok(call, 'the fake CLI was started');
+    allCwds.push(call.cwd);
+    child.kill(signal);
+    assert.deepEqual(await exited, { code, signal: null });
+    await new Promise((done) => setTimeout(done, 200));
+    assert.throws(() => process.kill(call.pid, 0), /ESRCH/, 'the CLI was stopped');
+    assert.equal(existsSync(call.cwd), false, 'its folder was removed');
+  } finally {
+    child.kill('SIGKILL');
+    if (call) { try { process.kill(-call.pid, 'SIGKILL'); } catch { /* gone */ } }
+  }
 });
 
 test('no folder or file is left behind by any CLI run', () => {

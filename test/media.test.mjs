@@ -3,8 +3,9 @@
 // unrelated rule (axe-core's own caption rule, say) without this file caring.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { chromium } from 'playwright';
 import { audit } from '../src/index.mjs';
-import { rules, embedCaptionIssues } from '../src/checks/media.mjs';
+import { rules, embedCaptionIssues, probes } from '../src/checks/media.mjs';
 import { startSite } from './helpers.mjs';
 
 const MINE = new Set(Object.keys(rules));
@@ -96,4 +97,39 @@ test('embedded players: no captions fails, automatic captions only is likely, co
   assert.deepEqual(ids(embedCaptionIssues({ provider: 'vimeo', tracks: [{ auto: false }], live: false, controlsOff: true, ...at })), [['failure', 'captions-no-control']]);
   assert.deepEqual(ids(embedCaptionIssues({ provider: 'youtube', tracks: [], live: true, ...at })), [['likely', 'live-no-captions']]);
   assert.deepEqual(ids(embedCaptionIssues({ provider: 'youtube', tracks: [{ auto: true }], live: true, ...at })), []);
+});
+
+// A stand-in for YouTube's embed page: a Play button and a #movie_player whose player
+// response is the one given. Routed in place of youtube.com, so nothing leaves the machine.
+const fakePlayer = (response) => `<!doctype html><html lang="en"><head><title>Player</title></head><body>
+<div id="movie_player"></div><button aria-label="Play (k)">Play</button>
+<script>document.getElementById('movie_player').getPlayerResponse = () => (${JSON.stringify(response)});</script></body></html>`;
+const PLAYERS = {
+  // What YouTube answers an automated browser on a data centre address: video details, no
+  // captions, and a playability status other than OK.
+  'bot-check': { videoDetails: { videoId: 'bot-check', isLive: false }, playabilityStatus: { status: 'LOGIN_REQUIRED', reason: "Sign in to confirm you're not a bot" } },
+  'no-captions': { videoDetails: { videoId: 'no-captions', isLive: false }, playabilityStatus: { status: 'OK' } },
+  captioned: { videoDetails: { videoId: 'captioned', isLive: false }, playabilityStatus: { status: 'OK' }, captions: { playerCaptionsTracklistRenderer: { captionTracks: [{ kind: '', languageCode: 'en' }] } } },
+};
+
+test('a YouTube player that will not play the video (bot check, age gate) is a note, not a missing-captions failure', async () => {
+  const iframe = (id) => `<iframe title="Video: ${id}" width="560" height="315" src="https://www.youtube.com/embed/${id}"></iframe>`;
+  const own = await startSite({ '/youtube.html': () => `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Videos</title></head><body><main><h1>Videos</h1>${Object.keys(PLAYERS).map(iframe).join('')}</main></body></html>` });
+  const browser = await chromium.launch({ channel: 'chrome' });
+  try {
+    const context = await browser.newContext();
+    await context.route(/^https:\/\/www\.youtube\.com\/embed\//, (route) => route.fulfill({ contentType: 'text/html', body: fakePlayer(PLAYERS[new URL(route.request().url()).pathname.split('/').pop()]) }));
+    const url = `${own.origin}/youtube.html`;
+    const page = await context.newPage();
+    await page.goto(url);
+    const fresh = async () => { const p = await context.newPage(); await p.goto(url); return p; };
+    const youtube = probes.find((p) => p.name === 'YouTube captions');
+    const out = await youtube.run(page, { fresh, level: 'AA' });
+    // Only the player that played and reported no captions is a failure.
+    assert.deepEqual(out.issues.map((i) => [i.kind, i.id, i.selector]), [['failure', 'embed-no-captions', 'html > body > main > iframe:nth-of-type(2)']]);
+    assert.deepEqual(out.notes, ["could not read the caption tracks of 1 YouTube player(s): YouTube would not play the video to this browser (LOGIN_REQUIRED), as it often does for automated browsers and data centre addresses; check their captions by hand"]);
+  } finally {
+    await browser.close();
+    await own.close();
+  }
 });
