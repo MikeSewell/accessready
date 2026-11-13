@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Status messages</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main, footer { padding: 24px; }
+  a { color: #0b4a8f; }
+  label { display: block; margin-top: 12px; }
+  input, button, textarea, select { font: inherit; padding: 8px 12px; margin: 4px 0; border: 1px solid #555; }
+  .error { color: #a00; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Programs</h1>
+  <p><button id="filters-button" type="button" aria-expanded="false" aria-controls="filters">Filters</button></p>
+  <div id="filters" hidden><p>Only programs open this month are shown.</p></div>
+  <p id="count">Showing all programs</p>
+  <ul>
+    <li>Food pantry</li>
+    <li>Homework club</li>
+    <li>Job search help</li>
+  </ul>
+  <div id="toast" class="toast"></div>
+</main>
+<script>  const button = document.getElementById('filters-button'), panel = document.getElementById('filters'), count = document.getElementById('count');
+  const set = (open) => {
+    panel.hidden = !open;
+    button.setAttribute('aria-expanded', String(open));
+    // The results count changes, outside any live region.
+    count.textContent = open ? 'Showing 2 programs' : 'Showing all programs';
+  };
+  button.addEventListener('click', () => set(button.getAttribute('aria-expanded') !== 'true'));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') set(false); });</script>
+</body>
+</html>

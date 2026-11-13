@@ -164,10 +164,11 @@ test('the inventory lists what a person has to look at', () => {
 });
 
 test('totals add up', () => {
-  // Two likely problems: the demo pages taken as one site offer only a menu (2.4.5), and
+  // Three likely problems: the demo pages taken as one site offer only a menu (2.4.5);
   // focus.html's wrapper ring is a pale yellow tint (#ffe08a on white, about 1.3:1) that 2.4.7
-  // accepts as visible and 1.4.11 flags as too faint.
-  assert.deepEqual(result.totals, { pages: 20, failures: 15, likely: 2, advice: 4, needsReview: result.totals.needsReview, errors: 0 });
+  // accepts as visible and 1.4.11 flags as too faint; inventory.html's required Email field is
+  // not marked as required.
+  assert.deepEqual(result.totals, { pages: 20, failures: 15, likely: 3, advice: 4, needsReview: result.totals.needsReview, errors: 0 });
   assert.equal(result.standard, 'WCAG 2.2 AA');
   assert.match(result.engine, /^axe-core \d+\.\d+\.\d+$/);
 });

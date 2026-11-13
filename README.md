@@ -45,8 +45,8 @@ As of axe-core 4.14, it has no rule for focus visibility, hidden focus, keyboard
 | Of the 86 WCAG 2.2 A and AA criteria | |
 |---|---|
 | 38 | have at least one automated check that can fail a page |
-| 15 | are not judged, but the HTML report lists exactly what a person has to look at |
-| 22 | need a person, with no help from the tool |
+| 8 | are not judged, but the HTML report lists exactly what a person has to look at |
+| 12 | need a person, with no help from the tool |
 <!-- coverage:end -->
 
 Every criterion, what is tested and what is left to a person: [docs/COVERAGE.md](https://github.com/MikeSewell/accessready/blob/main/docs/COVERAGE.md). The table is generated from the code and checked on every commit.
@@ -260,7 +260,9 @@ process.exitCode = exitCode(result);
 
 ## What it does to your pages
 
-accessready only does what a visitor could do. It clicks Reject on a cookie banner, presses Tab, hovers menus, and presses Enter on buttons marked `aria-expanded="false"`, closing each one again. It never submits a form and never presses Enter on a link. If a button navigates away anyway, it stops operating that page and says so.
+accessready only does what a visitor could do. It clicks Reject on a cookie banner, presses Tab, hovers menus, and presses Enter on buttons marked `aria-expanded="false"`, closing each one again. It never presses Enter on a link. If a button navigates away anyway, it stops operating that page and says so.
+
+To see how forms handle mistakes, it opens a separate copy of the page that cannot reach your server. While the copy loads, only GET and HEAD requests go out and service workers are off. Once the form test starts, every request, navigation and WebSocket message is stopped inside the browser and only recorded. In that copy it leaves required fields empty, types obvious nonsense such as `not-an-email` into typed fields, presses the submit button and reads what the page shows. It never types anything that looks like real data, tries at most three forms per page, and throws the copy away afterwards. If a form tries to send anyway, the report says so.
 
 ## How the focus check works
 

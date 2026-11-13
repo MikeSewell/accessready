@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Required fields in red</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main, footer { padding: 24px; }
+  a { color: #0b4a8f; }
+  label { display: block; margin-top: 12px; }
+  input, button, textarea, select { font: inherit; padding: 8px 12px; margin: 4px 0; border: 1px solid #555; }
+  .error { color: #a00; }
+  .req { color: #b00020; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Call me back</h1>
+  <p>Fields in red have to be filled in.</p>
+  <form action="/submit" method="post">
+    <label for="name" class="req">Name</label>
+    <input id="name" name="name" type="text" autocomplete="name" required>
+    <label for="org">Organization you work for</label>
+    <input id="org" name="org" type="text">
+    <button type="submit">Send</button>
+  </form>
+</main>
+</body>
+</html>

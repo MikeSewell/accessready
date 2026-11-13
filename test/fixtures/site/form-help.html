@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Long form with no help</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main, footer { padding: 24px; }
+  a { color: #0b4a8f; }
+  label { display: block; margin-top: 12px; }
+  input, button, textarea, select { font: inherit; padding: 8px 12px; margin: 4px 0; border: 1px solid #555; }
+  .error { color: #a00; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Apply for a food box</h1>
+  <form action="/submit" method="post">
+    <label for="name">Name (required)</label>
+    <input id="name" name="name" type="text" autocomplete="name" required>
+    <label for="street">Street address (required)</label>
+    <input id="street" name="street" type="text" autocomplete="street-address" required>
+    <label for="zip">ZIP code (required)</label>
+    <input id="zip" name="zip" type="text" autocomplete="postal-code" required>
+    <label for="size">Household size (required)</label>
+    <input id="size" name="size" type="number" min="1" max="20" required>
+    <label for="diet">Dietary needs</label>
+    <input id="diet" name="diet" type="text">
+    <button type="submit">Apply</button>
+  </form>
+</main>
+</body>
+</html>
