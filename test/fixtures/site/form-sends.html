@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forms that send</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main, footer { padding: 24px; }
+  a { color: #0b4a8f; }
+  label { display: block; margin-top: 12px; }
+  input, button, textarea, select { font: inherit; padding: 8px 12px; margin: 4px 0; border: 1px solid #555; }
+  .error { color: #a00; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Ways to reach us</h1>
+  <p>Each form below would send something to the server if it were allowed to.</p>
+  <form action="/submit" method="post" novalidate aria-label="Message">
+    <label for="msg">Message (required)</label>
+    <textarea id="msg" name="msg" required></textarea>
+    <button type="submit">Send message</button>
+  </form>
+  <form id="by-script" action="/submit" aria-label="Topic">
+    <label for="topic">Topic</label>
+    <input id="topic" name="topic" type="text">
+    <button type="submit">Suggest topic</button>
+  </form>
+  <form action="/submit-new-window" method="post" target="_blank" aria-label="Callback">
+    <label for="note">Note</label>
+    <input id="note" name="note" type="text">
+    <button type="submit">Ask for a call</button>
+  </form>
+  <form action="/submit-get" aria-label="Fourth">
+    <label for="other">Anything else</label>
+    <input id="other" name="other" type="text">
+    <button type="submit">Send note</button>
+  </form>
+</main>
+<script>  // Sends by script instead of navigating: a POST with fetch and a beacon.
+  document.getElementById('by-script').addEventListener('submit', (e) => {
+    e.preventDefault();
+    fetch('/submit-fetch', { method: 'POST', body: new FormData(e.target) }).catch(() => {});
+    navigator.sendBeacon('/submit-beacon', 'topic');
+  });</script>
+</body>
+</html>

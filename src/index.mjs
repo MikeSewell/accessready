@@ -64,9 +64,10 @@ async function open(page, url, timeout) {
   return res;
 }
 
-async function newContext(browser, viewport, opts) {
+async function newContext(browser, viewport, opts, extra = {}) {
   const { name, isMobile, hasTouch, ...size } = viewport;
   const context = await browser.newContext({
+    ...extra,
     viewport: size,
     // Firefox has no mobile emulation; it still renders at phone width.
     ...(isMobile && engineOf(browser) !== 'firefox' ? { isMobile: true } : {}),
@@ -134,9 +135,13 @@ async function auditPage(browser, url, viewport, opts) {
 
     // A fresh copy of the page for a check that changes things. `clock` gives it a clock the
     // check can move forward, to see what the page does after minutes have passed.
-    const fresh = async ({ clock = false } = {}) => {
-      const ctx = await newContext(browser, viewport, opts);
+    // `prepare(context)` runs before the copy loads, so a check can install request routing
+    // first. `serviceWorkers: 'block'` keeps service workers out of the copy: requests they
+    // make would bypass that routing.
+    const fresh = async ({ clock = false, prepare = null, serviceWorkers = 'allow' } = {}) => {
+      const ctx = await newContext(browser, viewport, opts, { serviceWorkers });
       extraContexts.push(ctx);
+      if (prepare) await prepare(ctx);
       const p = await ctx.newPage();
       if (clock) await p.clock.install();
       await loadPage(p, url, opts);

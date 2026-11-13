@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Payment with no review</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main, footer { padding: 24px; }
+  a { color: #0b4a8f; }
+  label { display: block; margin-top: 12px; }
+  input, button, textarea, select { font: inherit; padding: 8px 12px; margin: 4px 0; border: 1px solid #555; }
+  .error { color: #a00; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Give today</h1>
+  <p>Your gift buys food for families in our county.</p>
+  <form action="/submit" method="post">
+    <label for="amount">Amount in dollars</label>
+    <input id="amount" name="amount" type="text" inputmode="decimal">
+    <label for="cardname">Name on card</label>
+    <input id="cardname" name="cardname" type="text" autocomplete="cc-name">
+    <label for="card">Card number</label>
+    <input id="card" name="card" type="text" inputmode="numeric" autocomplete="cc-number">
+    <button type="submit">Donate now</button>
+  </form>
+</main>
+</body>
+</html>
