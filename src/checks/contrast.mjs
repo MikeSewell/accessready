@@ -89,3 +89,11 @@ export async function measureContrastOnImages(page, selectors) {
   await removeStyles();
   return { issues, unresolved, resolved };
 }
+
+export const rules = {
+  'contrast-on-image': {
+    title: 'Text over an image is too faint everywhere', criteria: ['1.4.3'], kinds: ['failure'],
+    covers: 'Text over images, gradients and video, measured from a screenshot with the text hidden.',
+    why: 'Text without enough contrast against its background is hard or impossible to read for people with low vision, and for everyone in bright light.',
+  },
+};

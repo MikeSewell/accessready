@@ -28,7 +28,7 @@ test('exits 0 on a clean page', async () => {
   const r = await run(`${site.origin}/clean.html`);
   assert.equal(r.code, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /\/clean\.html {2}no failures/);
-  assert.match(r.stdout, /No automated WCAG 2\.2 AA failures across 1 page {2}\(single page\)/);
+  assert.match(r.stdout, /No automated WCAG 2\.2 AA failures across 1 page {2}\(single page; desktop, phone\)/);
 });
 
 test('exits 1 when a page has failures', async () => {
@@ -47,25 +47,25 @@ test('with no paths it reads the sitemap, drops duplicates and stays on the audi
   assert.equal(r.code, 1);
   assert.match(r.stdout, /\/clean\.html {2}no failures/);
   assert.match(r.stdout, /\/reflow\.html {2}1 failure/);
-  assert.match(r.stdout, /across 2 pages {2}\(sitemap \(2 pages\)\)/);
+  assert.match(r.stdout, /across 2 pages {2}\(sitemap \(2 pages\); desktop, phone\)/);
 });
 
 test('--max limits the pages taken from the sitemap', async () => {
   const r = await run(site.origin, '--max', '1');
   assert.equal(r.code, 0);
-  assert.match(r.stdout, /across 1 page {2}\(sitemap \(2 pages, first 1 audited\)\)/);
+  assert.match(r.stdout, /across 1 page {2}\(sitemap \(2 pages, first 1 audited\); desktop, phone\)/);
 });
 
 test('--sitemap follows a sitemap index', async () => {
   const r = await run(site.origin, '--sitemap', `${site.origin}/sitemap-index.xml`);
-  assert.match(r.stdout, /across 3 pages {2}\(sitemap \(3 pages\)\)/);
+  assert.match(r.stdout, /across 3 pages {2}\(sitemap \(3 pages\); desktop, phone\)/);
   assert.match(r.stdout, /\/headings\.html {2}no failures/);
 });
 
 test('a site with no sitemap falls back to the home page and says so', async () => {
   const r = await run(site.origin, '--sitemap', `${site.origin}/missing.xml`);
   assert.equal(r.code, 0);
-  assert.match(r.stdout, /across 1 page {2}\(no sitemap at .*\/missing\.xml; home page only\)/);
+  assert.match(r.stdout, /across 1 page {2}\(no sitemap at .*\/missing\.xml; home page only; desktop, phone\)/);
 });
 
 test('a page that will not load exits 2', async () => {
@@ -102,7 +102,9 @@ test('bad arguments exit 2 with a message, before any browser starts', async () 
     [['ftp://example.org'], /Only http and https URLs/],
     [[site.origin, '--max', '0'], /--max needs a whole number above 0/],
     [[site.origin, '--viewport', 'big'], /--viewport needs WIDTHxHEIGHT/],
-    [[site.origin, '--browser', 'firefox'], /--browser must be auto, chrome or chromium/],
+    [[site.origin, '--browser', 'opera'], /--browser takes auto, chrome, chromium, firefox, webkit or all/],
+    [[site.origin, '--level', 'AAAA'], /--level must be A, AA or AAA/],
+    [[site.origin, '--viewports', 'tablet'], /--viewports takes desktop, phone or WIDTHxHEIGHT/],
     [[site.origin, '--storage-state', join(dir, 'missing.json')], /--storage-state file not found/],
     [[site.origin, '--nonsense'], /Unknown option '--nonsense'/],
   ]) {

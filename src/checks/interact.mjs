@@ -228,3 +228,31 @@ export async function checkDisclosures(page) {
   await page.evaluate(() => document.querySelectorAll('[data-accessready-toggle]').forEach((el) => el.removeAttribute('data-accessready-toggle'))).catch(() => {});
   return { issues, notes };
 }
+
+export const rules = {
+  'keyboard-unreachable': {
+    title: 'Control cannot be reached with the keyboard', criteria: ['2.1.1'], kinds: ['failure'],
+    covers: 'Controls with a click handler or an interactive role that the Tab key never reaches.',
+    why: 'People who cannot use a mouse reach every control with the Tab key. A control that Tab skips does not exist for them.',
+  },
+  'looks-clickable': {
+    title: 'Looks clickable but cannot be reached with the keyboard', criteria: ['2.1.1'], kinds: ['advice'],
+    covers: 'Elements with a pointer cursor that Tab never reaches are noted for a person to try.',
+    why: 'If this does something when clicked, people who cannot use a mouse have no way to do it.',
+  },
+  'hover-only-menu': {
+    title: 'Menu opens on mouse hover only', criteria: ['2.1.1'], kinds: ['failure'],
+    covers: 'Navigation menus are hovered, then the same is tried from the keyboard.',
+    why: 'A menu that only opens when a mouse hovers over it hides every page inside it from keyboard and many touch-screen users.',
+  },
+  'keyboard-activation': {
+    title: 'Button works with the mouse but not the keyboard', criteria: ['2.1.1'], kinds: ['failure'],
+    covers: 'Buttons that open something are pressed with Enter and Space as well as clicked.',
+    why: 'Keyboard users press Enter or Space where mouse users click. A control that ignores both is a dead end for them.',
+  },
+  'dialog-focus': {
+    title: 'Dialog opens without taking keyboard focus', criteria: ['2.4.3'], kinds: ['advice'],
+    covers: 'A dialog that opens without taking keyboard focus is noted.',
+    why: 'When a dialog opens and focus stays behind it, a screen reader user is not told it opened, and a keyboard user has to hunt for it.',
+  },
+};

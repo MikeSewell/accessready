@@ -46,7 +46,10 @@
   },
   "dependencies": {
     "@axe-core/playwright": "^4.14.0",
+    "franc-min": "^6.2.0",
+    "pdfjs-dist": "^6.5.438",
     "playwright": "^1.65.0",
-    "pngjs": "^7.0.0"
+    "pngjs": "^7.0.0",
+    "tesseract.js": "^7.0.0"
   }
 }

@@ -11,7 +11,7 @@ const page = (name) => result.pages[PAGES.indexOf(name)];
 
 before(async () => {
   site = await startSite();
-  result = await audit(site.origin, { paths: PAGES.map((p) => `/${p}.html`), concurrency: 3 });
+  result = await audit(site.origin, { viewports: ['desktop'], paths: PAGES.map((p) => `/${p}.html`), concurrency: 3 });
 });
 after(() => site.close());
 
@@ -161,30 +161,30 @@ test('the inventory lists what a person has to look at', () => {
 });
 
 test('totals add up', () => {
-  assert.deepEqual(result.totals, { pages: 20, failures: 15, advice: 4, needsReview: result.totals.needsReview, errors: 0 });
+  assert.deepEqual(result.totals, { pages: 20, failures: 15, likely: 0, advice: 4, needsReview: result.totals.needsReview, errors: 0 });
   assert.equal(result.standard, 'WCAG 2.2 AA');
   assert.match(result.engine, /^axe-core \d+\.\d+\.\d+$/);
 });
 
 test('pages are compared with each other: navigation order and shared titles', async () => {
-  const r = await audit(site.origin, { paths: ['/nav-a.html', '/nav-b.html', '/nav-c.html', '/nav-d.html'] });
+  const r = await audit(site.origin, { viewports: ['desktop'], paths: ['/nav-a.html', '/nav-b.html', '/nav-c.html', '/nav-d.html'] });
   const found = r.pages.map((p) => p.issues.map((i) => `${i.kind}:${i.id}`));
   // a and b share a title; c lists Donate before Programs; d only drops a link, which is fine.
   assert.deepEqual(found, [['advice:duplicate-title'], ['advice:duplicate-title'], ['failure:inconsistent-navigation'], []]);
   assert.match(r.pages[2].issues[0].message, /"Programs" in a different place .* \(usual order: Home, Programs, Donate, Contact\)$/);
   assert.ok(r.pages.every((p) => p.issues.every((i) => i.scope === 'site')));
-  assert.deepEqual(r.totals, { pages: 4, failures: 1, advice: 2, needsReview: 0, errors: 0 });
+  assert.deepEqual(r.totals, { pages: 4, failures: 1, likely: 0, advice: 2, needsReview: 0, errors: 0 });
 });
 
 test('with dismissal off, the banner is reported as covering the page', async () => {
-  const r = await audit(`${site.origin}/banner.html`, { dismiss: false });
+  const r = await audit(`${site.origin}/banner.html`, { viewports: ['desktop'], dismiss: false });
   assert.equal(r.discovery, 'single page');
   assert.deepEqual(ids(r.pages[0]), ['focus-not-obscured']);
   assert.match(r.pages[0].issues[0].message, /#cookie-banner/);
 });
 
 test('the tab stop limit is honoured and reported', async () => {
-  const r = await audit(`${site.origin}/focus.html`, { maxTabStops: 2 });
+  const r = await audit(`${site.origin}/focus.html`, { viewports: ['desktop'], maxTabStops: 2 });
   assert.equal(r.pages[0].tabStops, 2);
   assert.deepEqual(r.pages[0].notes, ['stopped after 2 tab stops; the rest of the page was not walked']);
 });

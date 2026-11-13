@@ -10,22 +10,22 @@ const reports = {};
 
 before(async () => {
   site = await startSite({ '/report-failing': () => reports.failing, '/report-clean': () => reports.clean });
-  failing = await audit(site.origin, { paths: ['/focus.html', '/rules.html', '/headings.html', '/obscured.html', '/inventory.html', '/overimage.html', '/video.html', '/nav-a.html', '/nav-c.html', '/nope.html'] });
-  clean = await audit(`${site.origin}/clean.html`);
+  failing = await audit(site.origin, { viewports: ['desktop'], paths: ['/focus.html', '/rules.html', '/headings.html', '/obscured.html', '/inventory.html', '/overimage.html', '/video.html', '/nav-a.html', '/nav-c.html', '/nope.html'] });
+  clean = await audit(`${site.origin}/clean.html`, { viewports: ['desktop'] });
   reports.failing = renderHtml(failing);
   reports.clean = renderHtml(clean);
 });
 after(() => site.close());
 
 test('the report passes its own audit when it lists problems', async () => {
-  const r = await audit(`${site.origin}/report-failing`);
+  const r = await audit(`${site.origin}/report-failing`, { viewports: ['desktop'] });
   assert.deepEqual(r.pages[0].issues, []);
   assert.equal(r.pages[0].error, null);
   assert.ok(r.pages[0].tabStops > 5, 'links and disclosure controls are reachable by keyboard');
 });
 
 test('the report passes its own audit when there is nothing to fix', async () => {
-  const r = await audit(`${site.origin}/report-clean`);
+  const r = await audit(`${site.origin}/report-clean`, { viewports: ['desktop'] });
   assert.deepEqual(r.pages[0].issues, []);
   assert.match(reports.clean, /The automated checks found nothing to fix\./);
   assert.match(reports.clean, /No problems found by the automated checks/);

@@ -59,3 +59,16 @@ export function checkAcrossPages(pages) {
   navigationOrder(audited);
   duplicateTitles(audited);
 }
+
+export const rules = {
+  'inconsistent-navigation': {
+    title: 'Navigation is in a different order on this page', criteria: ['3.2.3'], kinds: ['failure'],
+    covers: 'The main navigation is compared across every page audited; a page that lists the same links in a different order fails.',
+    why: 'People who navigate by memory or with a screen reader rely on the menu being in the same order on every page.',
+  },
+  'duplicate-title': {
+    title: 'Page title is shared with another page', criteria: ['2.4.2'], kinds: ['advice'],
+    covers: 'Different pages that share a title are noted.',
+    why: 'The page title is the first thing a screen reader announces, and it is what tabs, bookmarks and search results show.',
+  },
+};

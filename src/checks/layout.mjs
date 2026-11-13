@@ -110,3 +110,21 @@ export async function checkTextSpacing(page) {
   await page.waitForTimeout(100);
   return issues;
 }
+
+export const rules = {
+  'moving-video': {
+    title: 'Video plays by itself with no pause control', criteria: ['2.2.2'], kinds: ['failure'],
+    covers: 'Video that plays by itself with no pause control.',
+    why: 'Video that starts by itself and cannot be paused distracts people with attention or vestibular conditions, and can make the rest of the page unusable for them.',
+  },
+  reflow: {
+    title: 'Page scrolls sideways at 320px wide', criteria: ['1.4.10'], kinds: ['failure'],
+    covers: 'Sideways scrolling at 320px wide, with the widest element named.',
+    why: 'People with low vision zoom the page to 400%. If the page then scrolls sideways, they have to scroll in two directions to read each line.',
+  },
+  'text-spacing': {
+    title: 'Text is cut off when spacing is increased', criteria: ['1.4.12'], kinds: ['failure'],
+    covers: 'Text that is cut off once line, letter, word and paragraph spacing are widened to the values WCAG names.',
+    why: 'People with dyslexia or low vision widen the spacing between lines, letters and words to make text readable. Boxes with a fixed size then cut the text off.',
+  },
+};

@@ -275,3 +275,26 @@ export async function walkKeyboard(page, { maxStops = 150 } = {}) {
 
   return { issues, stops, capped, framesSkipped, dialogsOpened };
 }
+
+export const rules = {
+  'focus-visible': {
+    title: 'No visible focus indicator', criteria: ['2.4.7'], kinds: ['failure'],
+    covers: 'Every Tab stop is screenshotted focused and unfocused; if nothing on screen changes, it fails.',
+    why: 'People who use a keyboard instead of a mouse move through a page with the Tab key. If nothing on screen shows which link or button is selected, they cannot tell where they are.',
+  },
+  'focus-caret-only': {
+    title: 'Only the text cursor shows focus', criteria: ['2.4.7'], kinds: ['advice'],
+    covers: 'Text fields whose only sign of focus is the text cursor are noted.',
+    why: 'A thin text cursor is easy to miss, especially for people with low vision. An outline around the field makes the selected field obvious.',
+  },
+  'focus-not-obscured': {
+    title: 'Focused element is hidden', criteria: ['2.4.11'], kinds: ['failure'],
+    covers: 'Every Tab stop is checked for being completely covered by something else or off screen.',
+    why: 'When the selected link or button is covered by a sticky header, a cookie banner or a chat bubble, a keyboard user is working blind.',
+  },
+  'keyboard-trap': {
+    title: 'Keyboard focus gets stuck', criteria: ['2.1.2'], kinds: ['failure'],
+    covers: 'An element that Tab and Shift+Tab cannot leave.',
+    why: 'Once keyboard focus is stuck on one element, a keyboard user cannot reach anything after it, and often cannot leave the page without closing the browser.',
+  },
+};

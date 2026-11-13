@@ -1,99 +1,133 @@
-// WCAG 2.2 level A and AA success criteria, by number.
+// Every WCAG 2.2 success criterion, A, AA and AAA, with the WCAG version that added it, and
+// the legal standards that are built on WCAG. 4.1.1 Parsing is not listed: WCAG 2.2 removed
+// it, and W3C's errata for 2.0 and 2.1 treat it as always met for HTML.
+
+const c = (name, level, since = '2.0') => ({ name, level, since });
+
 export const CRITERIA = {
-  '1.1.1': 'Non-text Content',
-  '1.2.1': 'Audio-only and Video-only (Prerecorded)',
-  '1.2.2': 'Captions (Prerecorded)',
-  '1.2.3': 'Audio Description or Media Alternative (Prerecorded)',
-  '1.2.4': 'Captions (Live)',
-  '1.2.5': 'Audio Description (Prerecorded)',
-  '1.3.1': 'Info and Relationships',
-  '1.3.2': 'Meaningful Sequence',
-  '1.3.3': 'Sensory Characteristics',
-  '1.3.4': 'Orientation',
-  '1.3.5': 'Identify Input Purpose',
-  '1.4.1': 'Use of Color',
-  '1.4.2': 'Audio Control',
-  '1.4.3': 'Contrast (Minimum)',
-  '1.4.4': 'Resize Text',
-  '1.4.5': 'Images of Text',
-  '1.4.10': 'Reflow',
-  '1.4.11': 'Non-text Contrast',
-  '1.4.12': 'Text Spacing',
-  '1.4.13': 'Content on Hover or Focus',
-  '2.1.1': 'Keyboard',
-  '2.1.2': 'No Keyboard Trap',
-  '2.1.4': 'Character Key Shortcuts',
-  '2.2.1': 'Timing Adjustable',
-  '2.2.2': 'Pause, Stop, Hide',
-  '2.3.1': 'Three Flashes or Below Threshold',
-  '2.4.1': 'Bypass Blocks',
-  '2.4.2': 'Page Titled',
-  '2.4.3': 'Focus Order',
-  '2.4.4': 'Link Purpose (In Context)',
-  '2.4.5': 'Multiple Ways',
-  '2.4.6': 'Headings and Labels',
-  '2.4.7': 'Focus Visible',
-  '2.4.11': 'Focus Not Obscured (Minimum)',
-  '2.5.1': 'Pointer Gestures',
-  '2.5.2': 'Pointer Cancellation',
-  '2.5.3': 'Label in Name',
-  '2.5.4': 'Motion Actuation',
-  '2.5.7': 'Dragging Movements',
-  '2.5.8': 'Target Size (Minimum)',
-  '3.1.1': 'Language of Page',
-  '3.1.2': 'Language of Parts',
-  '3.2.1': 'On Focus',
-  '3.2.2': 'On Input',
-  '3.2.3': 'Consistent Navigation',
-  '3.2.4': 'Consistent Identification',
-  '3.2.6': 'Consistent Help',
-  '3.3.1': 'Error Identification',
-  '3.3.2': 'Labels or Instructions',
-  '3.3.3': 'Error Suggestion',
-  '3.3.4': 'Error Prevention (Legal, Financial, Data)',
-  '3.3.7': 'Redundant Entry',
-  '3.3.8': 'Accessible Authentication (Minimum)',
-  '4.1.2': 'Name, Role, Value',
-  '4.1.3': 'Status Messages',
+  '1.1.1': c('Non-text Content', 'A'),
+  '1.2.1': c('Audio-only and Video-only (Prerecorded)', 'A'),
+  '1.2.2': c('Captions (Prerecorded)', 'A'),
+  '1.2.3': c('Audio Description or Media Alternative (Prerecorded)', 'A'),
+  '1.2.4': c('Captions (Live)', 'AA'),
+  '1.2.5': c('Audio Description (Prerecorded)', 'AA'),
+  '1.2.6': c('Sign Language (Prerecorded)', 'AAA'),
+  '1.2.7': c('Extended Audio Description (Prerecorded)', 'AAA'),
+  '1.2.8': c('Media Alternative (Prerecorded)', 'AAA'),
+  '1.2.9': c('Audio-only (Live)', 'AAA'),
+  '1.3.1': c('Info and Relationships', 'A'),
+  '1.3.2': c('Meaningful Sequence', 'A'),
+  '1.3.3': c('Sensory Characteristics', 'A'),
+  '1.3.4': c('Orientation', 'AA', '2.1'),
+  '1.3.5': c('Identify Input Purpose', 'AA', '2.1'),
+  '1.3.6': c('Identify Purpose', 'AAA', '2.1'),
+  '1.4.1': c('Use of Color', 'A'),
+  '1.4.2': c('Audio Control', 'A'),
+  '1.4.3': c('Contrast (Minimum)', 'AA'),
+  '1.4.4': c('Resize Text', 'AA'),
+  '1.4.5': c('Images of Text', 'AA'),
+  '1.4.6': c('Contrast (Enhanced)', 'AAA'),
+  '1.4.7': c('Low or No Background Audio', 'AAA'),
+  '1.4.8': c('Visual Presentation', 'AAA'),
+  '1.4.9': c('Images of Text (No Exception)', 'AAA'),
+  '1.4.10': c('Reflow', 'AA', '2.1'),
+  '1.4.11': c('Non-text Contrast', 'AA', '2.1'),
+  '1.4.12': c('Text Spacing', 'AA', '2.1'),
+  '1.4.13': c('Content on Hover or Focus', 'AA', '2.1'),
+  '2.1.1': c('Keyboard', 'A'),
+  '2.1.2': c('No Keyboard Trap', 'A'),
+  '2.1.3': c('Keyboard (No Exception)', 'AAA'),
+  '2.1.4': c('Character Key Shortcuts', 'A', '2.1'),
+  '2.2.1': c('Timing Adjustable', 'A'),
+  '2.2.2': c('Pause, Stop, Hide', 'A'),
+  '2.2.3': c('No Timing', 'AAA'),
+  '2.2.4': c('Interruptions', 'AAA'),
+  '2.2.5': c('Re-authenticating', 'AAA'),
+  '2.2.6': c('Timeouts', 'AAA', '2.1'),
+  '2.3.1': c('Three Flashes or Below Threshold', 'A'),
+  '2.3.2': c('Three Flashes', 'AAA'),
+  '2.3.3': c('Animation from Interactions', 'AAA', '2.1'),
+  '2.4.1': c('Bypass Blocks', 'A'),
+  '2.4.2': c('Page Titled', 'A'),
+  '2.4.3': c('Focus Order', 'A'),
+  '2.4.4': c('Link Purpose (In Context)', 'A'),
+  '2.4.5': c('Multiple Ways', 'AA'),
+  '2.4.6': c('Headings and Labels', 'AA'),
+  '2.4.7': c('Focus Visible', 'AA'),
+  '2.4.8': c('Location', 'AAA'),
+  '2.4.9': c('Link Purpose (Link Only)', 'AAA'),
+  '2.4.10': c('Section Headings', 'AAA'),
+  '2.4.11': c('Focus Not Obscured (Minimum)', 'AA', '2.2'),
+  '2.4.12': c('Focus Not Obscured (Enhanced)', 'AAA', '2.2'),
+  '2.4.13': c('Focus Appearance', 'AAA', '2.2'),
+  '2.5.1': c('Pointer Gestures', 'A', '2.1'),
+  '2.5.2': c('Pointer Cancellation', 'A', '2.1'),
+  '2.5.3': c('Label in Name', 'A', '2.1'),
+  '2.5.4': c('Motion Actuation', 'A', '2.1'),
+  '2.5.5': c('Target Size (Enhanced)', 'AAA', '2.1'),
+  '2.5.6': c('Concurrent Input Mechanisms', 'AAA', '2.1'),
+  '2.5.7': c('Dragging Movements', 'AA', '2.2'),
+  '2.5.8': c('Target Size (Minimum)', 'AA', '2.2'),
+  '3.1.1': c('Language of Page', 'A'),
+  '3.1.2': c('Language of Parts', 'AA'),
+  '3.1.3': c('Unusual Words', 'AAA'),
+  '3.1.4': c('Abbreviations', 'AAA'),
+  '3.1.5': c('Reading Level', 'AAA'),
+  '3.1.6': c('Pronunciation', 'AAA'),
+  '3.2.1': c('On Focus', 'A'),
+  '3.2.2': c('On Input', 'A'),
+  '3.2.3': c('Consistent Navigation', 'AA'),
+  '3.2.4': c('Consistent Identification', 'AA'),
+  '3.2.5': c('Change on Request', 'AAA'),
+  '3.2.6': c('Consistent Help', 'A', '2.2'),
+  '3.3.1': c('Error Identification', 'A'),
+  '3.3.2': c('Labels or Instructions', 'A'),
+  '3.3.3': c('Error Suggestion', 'AA'),
+  '3.3.4': c('Error Prevention (Legal, Financial, Data)', 'AA'),
+  '3.3.5': c('Help', 'AAA'),
+  '3.3.6': c('Error Prevention (All)', 'AAA'),
+  '3.3.7': c('Redundant Entry', 'A', '2.2'),
+  '3.3.8': c('Accessible Authentication (Minimum)', 'AA', '2.2'),
+  '3.3.9': c('Accessible Authentication (Enhanced)', 'AAA', '2.2'),
+  '4.1.2': c('Name, Role, Value', 'A'),
+  '4.1.3': c('Status Messages', 'AA', '2.1'),
 };
+
+export const LEVELS = ['A', 'AA', 'AAA'];
+const RANK = { A: 1, AA: 2, AAA: 3 };
+const VERSION = { '2.0': 0, '2.1': 1, '2.2': 2 };
+
+// Is this criterion part of a conformance target such as "AA"?
+export const inLevel = (number, level) => !!CRITERIA[number] && RANK[CRITERIA[number].level] <= RANK[level];
 
 export const criterionLabel = (wcag) => wcag.length
-  ? wcag.map((n) => (CRITERIA[n] ? `${n} ${CRITERIA[n]}` : n)).join(', ')
+  ? wcag.map((n) => (CRITERIA[n] ? `${n} ${CRITERIA[n].name}` : n)).join(', ')
   : 'Best practice';
 
-// Why each of accessready's own checks matters, in plain words, for the HTML report.
-export const WHY = {
-  'focus-visible': 'People who use a keyboard instead of a mouse move through a page with the Tab key. If nothing on screen shows which link or button is selected, they cannot tell where they are.',
-  'focus-caret-only': 'A thin text cursor is easy to miss, especially for people with low vision. An outline around the field makes the selected field obvious.',
-  'focus-not-obscured': 'When the selected link or button is covered by a sticky header, a cookie banner or a chat bubble, a keyboard user is working blind.',
-  'moving-video': 'Video that starts by itself and cannot be paused distracts people with attention or vestibular conditions, and can make the rest of the page unusable for them.',
-  'keyboard-trap': 'Once keyboard focus is stuck on one element, a keyboard user cannot reach anything after it, and often cannot leave the page without closing the browser.',
-  'keyboard-unreachable': 'People who cannot use a mouse reach every control with the Tab key. A control that Tab skips does not exist for them.',
-  'looks-clickable': 'If this does something when clicked, people who cannot use a mouse have no way to do it.',
-  'hover-only-menu': 'A menu that only opens when a mouse hovers over it hides every page inside it from keyboard and many touch-screen users.',
-  'keyboard-activation': 'Keyboard users press Enter or Space where mouse users click. A control that ignores both is a dead end for them.',
-  'dialog-focus': 'When a dialog opens and focus stays behind it, a screen reader user is not told it opened, and a keyboard user has to hunt for it.',
-  'text-spacing': 'People with dyslexia or low vision widen the spacing between lines, letters and words to make text readable. Boxes with a fixed size then cut the text off.',
-  'contrast-on-image': 'Text without enough contrast against its background is hard or impossible to read for people with low vision, and for everyone in bright light.',
-  'inconsistent-navigation': 'People who navigate by memory or with a screen reader rely on the menu being in the same order on every page.',
-  'duplicate-title': 'The page title is the first thing a screen reader announces, and it is what tabs, bookmarks and search results show.',
-  'reflow': 'People with low vision zoom the page to 400%. If the page then scrolls sideways, they have to scroll in two directions to read each line.',
+// W3C's Understanding page for a criterion. The slug is the name in lower case, without
+// punctuation, words joined by hyphens: "Pause, Stop, Hide" is pause-stop-hide.
+export const understandingUrl = (number) => CRITERIA[number]
+  ? `https://www.w3.org/WAI/WCAG22/Understanding/${CRITERIA[number].name.toLowerCase().replace(/[(),]/g, '').replace(/\s+/g, '-')}.html`
+  : null;
+
+const wcagSet = (version, level, except = []) => Object.keys(CRITERIA).filter((n) =>
+  VERSION[CRITERIA[n].since] <= VERSION[version] && RANK[CRITERIA[n].level] <= RANK[level] && !except.includes(n));
+
+// Requirements outside WCAG that some standards add for the web: the player controls for
+// captions and audio description, and documents (PDFs) linked from a site.
+export const EXTRA = {
+  'caption-controls': 'Captions and audio description can be turned on from the player\'s own controls',
+  documents: 'Documents linked from the site (PDF) are accessible',
 };
 
-export const UNDERSTANDING = {
-  'focus-visible': 'https://www.w3.org/WAI/WCAG22/Understanding/focus-visible.html',
-  'focus-caret-only': 'https://www.w3.org/WAI/WCAG22/Understanding/focus-visible.html',
-  'focus-not-obscured': 'https://www.w3.org/WAI/WCAG22/Understanding/focus-not-obscured-minimum.html',
-  'moving-video': 'https://www.w3.org/WAI/WCAG22/Understanding/pause-stop-hide.html',
-  'reflow': 'https://www.w3.org/WAI/WCAG22/Understanding/reflow.html',
-  'keyboard-trap': 'https://www.w3.org/WAI/WCAG22/Understanding/no-keyboard-trap.html',
-  'keyboard-unreachable': 'https://www.w3.org/WAI/WCAG22/Understanding/keyboard.html',
-  'looks-clickable': 'https://www.w3.org/WAI/WCAG22/Understanding/keyboard.html',
-  'hover-only-menu': 'https://www.w3.org/WAI/WCAG22/Understanding/keyboard.html',
-  'keyboard-activation': 'https://www.w3.org/WAI/WCAG22/Understanding/keyboard.html',
-  'dialog-focus': 'https://www.w3.org/WAI/WCAG22/Understanding/focus-order.html',
-  'text-spacing': 'https://www.w3.org/WAI/WCAG22/Understanding/text-spacing.html',
-  'contrast-on-image': 'https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html',
-  'inconsistent-navigation': 'https://www.w3.org/WAI/WCAG22/Understanding/consistent-navigation.html',
-  'duplicate-title': 'https://www.w3.org/WAI/WCAG22/Understanding/page-titled.html',
-};
+// The standards a report can be read against. `wcag` is the set of criteria each one
+// includes; `extra` the further requirements above. Where a standard names an older WCAG
+// version, criteria added later are not part of it, even though accessready still checks them.
+export const STANDARDS = [
+  { id: 'wcag22-aa', name: 'WCAG 2.2 AA', wcag: wcagSet('2.2', 'AA'), extra: [], basis: 'W3C Recommendation, 12 December 2024' },
+  { id: 'wcag22-aaa', name: 'WCAG 2.2 AAA', wcag: wcagSet('2.2', 'AAA'), extra: [], basis: 'Everything in WCAG 2.2. W3C does not recommend requiring AAA for whole sites.' },
+  { id: 'ada-title-ii', name: 'ADA Title II (US state and local government)', wcag: wcagSet('2.1', 'AA'), extra: ['documents'], basis: 'DOJ rule of April 2024: WCAG 2.1 AA for web content and conventional electronic documents' },
+  { id: 'section-508', name: 'Section 508 (US federal)', wcag: wcagSet('2.0', 'AA'), extra: ['caption-controls', 'documents'], basis: 'WCAG 2.0 AA (E205.4), caption and audio description controls (503.4)' },
+  { id: 'en-301-549', name: 'EN 301 549 (EU, European Accessibility Act)', wcag: wcagSet('2.1', 'AA'), extra: ['caption-controls', 'documents'], basis: 'v3.2.1: clause 9 is WCAG 2.1 AA; clause 7 covers caption and audio description controls; clause 10 covers documents' },
+  { id: 'aoda', name: 'AODA (Ontario)', wcag: wcagSet('2.0', 'AA', ['1.2.4', '1.2.5']), extra: [], basis: 'Integrated Accessibility Standards: WCAG 2.0 AA, except live captions and prerecorded audio description' },
+];

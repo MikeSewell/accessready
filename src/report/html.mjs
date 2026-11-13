@@ -1,6 +1,7 @@
 // A single self-contained HTML file written for the person who owns the site, not only the
 // developer who fixes it. It has to pass its own audit; test/report.test.mjs checks that.
-import { criterionLabel, WHY, UNDERSTANDING } from '../wcag.mjs';
+import { criterionLabel, understandingUrl } from '../wcag.mjs';
+import { RULES } from '../checks/index.mjs';
 import { coverage } from '../coverage.mjs';
 import { pathOf } from './console.mjs';
 
@@ -23,8 +24,8 @@ function groupByRule(pages, kind) {
 
 function ruleCard(group) {
   const { first, items, pages } = group;
-  const why = WHY[first.id] || first.description || '';
-  const link = first.helpUrl || UNDERSTANDING[first.id];
+  const why = RULES[first.id]?.why || first.description || '';
+  const link = first.helpUrl || understandingUrl(first.wcag[0]);
   const examples = items.slice(0, EXAMPLES).map(({ issue, page }) => `
         <li>
           <p><strong>${esc(pathOf(page.url))}</strong> ${esc(issue.message)}</p>

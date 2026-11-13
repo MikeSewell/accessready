@@ -21,6 +21,7 @@ export function renderPage(page, { color = false } = {}) {
   // Findings that come from comparing pages are printed once, in the summary.
   const own = page.issues.filter((i) => i.scope !== 'site');
   const failures = own.filter((i) => i.kind === 'failure');
+  const likely = own.filter((i) => i.kind === 'likely');
   const advice = own.filter((i) => i.kind === 'advice');
   const head = page.error
     ? c.red(page.error)
@@ -28,6 +29,7 @@ export function renderPage(page, { color = false } = {}) {
       ? c.red(plural(failures.length, 'failure'))
       : c.green('no failures');
   const extra = [];
+  if (likely.length) extra.push(c.yellow(plural(likely.length, 'likely problem')));
   if (advice.length) extra.push(c.yellow(plural(advice.length, 'best-practice note')));
   if (!page.error) extra.push(c.dim(plural(page.tabStops, 'tab stop')));
   lines.push(`${c.bold(pathOf(page.url))}  ${head}${extra.length ? '  ' + extra.join('  ') : ''}`);
@@ -40,10 +42,10 @@ export function renderPage(page, { color = false } = {}) {
   }
   for (const list of groups.values()) {
     const first = list[0];
-    const mark = first.kind === 'failure' ? c.red('FAIL') : c.yellow('note');
+    const mark = first.kind === 'failure' ? c.red('FAIL') : first.kind === 'likely' ? c.yellow('LIKELY') : c.yellow('note');
     lines.push(`  ${mark}  ${first.title}  ${c.dim(`${criterionLabel(first.wcag)} · ${first.id}`)}${list.length > 1 ? `  x${list.length}` : ''}`);
     for (const issue of list.slice(0, EXAMPLES_PER_RULE)) {
-      lines.push(`        ${issue.message}`);
+      lines.push(`        ${issue.message}${issue.seenOn ? c.dim(`  (${issue.seenOn.join(', ')} only)`) : ''}`);
       if (issue.selector) lines.push(`        ${c.cyan(issue.selector)}`);
     }
     if (list.length > EXAMPLES_PER_RULE) lines.push(c.dim(`        and ${list.length - EXAMPLES_PER_RULE} more`));
@@ -78,7 +80,7 @@ export function renderSummary(result, { color = false } = {}) {
   if (acrossSite.length) {
     lines.push(c.bold('Across the site'));
     for (const i of acrossSite) {
-      const mark = i.kind === 'failure' ? c.red('FAIL') : c.yellow('note');
+      const mark = i.kind === 'failure' ? c.red('FAIL') : i.kind === 'likely' ? c.yellow('LIKELY') : c.yellow('note');
       lines.push(`  ${mark}  ${c.bold(i.path)}  ${i.title}  ${c.dim(criterionLabel(i.wcag))}`);
       lines.push(`        ${i.message}`);
     }
@@ -88,9 +90,11 @@ export function renderSummary(result, { color = false } = {}) {
   const verdict = t.errors
     ? c.red(`${plural(t.errors, 'page')} could not be audited`)
     : t.failures
-      ? c.red(plural(t.failures, 'WCAG 2.2 AA failure'))
-      : c.green('No automated WCAG 2.2 AA failures');
-  lines.push(`${c.bold(result.target)}  ${verdict} across ${plural(t.pages, 'page')}  ${c.dim(`(${result.discovery})`)}`);
+      ? c.red(plural(t.failures, `${result.standard} failure`))
+      : c.green(`No automated ${result.standard} failures`);
+  const views = [...(result.viewports || []), ...((result.browsers || []).length > 1 ? result.browsers : [])];
+  lines.push(`${c.bold(result.target)}  ${verdict} across ${plural(t.pages, 'page')}  ${c.dim(`(${result.discovery}${views.length > 1 ? `; ${views.join(', ')}` : ''})`)}`);
+  if (t.likely) lines.push(c.yellow(`${plural(t.likely, 'likely problem')} a person should confirm; these do not fail the run unless --strict is set`));
   if (t.advice) lines.push(c.dim(`${plural(t.advice, 'best-practice note')}; these do not fail the run unless --strict is set`));
   if (t.needsReview) lines.push(c.dim(`${plural(t.needsReview, 'element')} the checks could not judge; a person has to look at them`));
   lines.push(c.dim('Automated checks find some accessibility problems, not all of them. A pass here is not a statement of conformance.'));
