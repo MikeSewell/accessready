@@ -219,7 +219,7 @@ test('provider addresses and keys', () => {
   assert.equal(resolveAi('ollama:qwen2.5vl:7b', {}).ai.model, 'qwen2.5vl:7b');
   assert.match(resolveAi('anthropic:m', {}).error, /ANTHROPIC_API_KEY/);
   assert.match(resolveAi('mistral:m', env).error, /must be one of/);
-  assert.match(resolveAi('openai:', env).error, /name the model/);
+  assert.match(resolveAi('openai:', env).error, /openai needs provider:model/);
   assert.match(resolveAi({ use: 'ollama:m', baseUrl: 'ftp://x' }, env).error, /http or https/);
 });
 
@@ -322,8 +322,8 @@ test('CLI: with --json - the plan goes to stderr, the findings into the JSON, th
 
 test('CLI: AI mistakes in the arguments exit 2 before any browser starts', async () => {
   for (const [args, env, message] of [
-    [['--ai', 'mistral:large'], {}, /AI provider must be one of anthropic, openai, gemini, lmstudio, ollama, openai-compatible, got "mistral"/],
-    [['--ai', 'anthropic'], {}, /--ai needs provider:model/],
+    [['--ai', 'mistral:large'], {}, /AI provider must be one of anthropic, openai, gemini, lmstudio, ollama, openai-compatible, claude-code, codex, gemini-cli, qwen-code, got "mistral"/],
+    [['--ai', 'anthropic'], {}, /anthropic needs provider:model/],
     [['--ai', 'anthropic:m'], {}, /anthropic needs an API key: set ANTHROPIC_API_KEY \(or ACCESSREADY_AI_KEY\)/],
     [['--ai', 'openai-compatible:m'], {}, /needs a base URL \(--ai-base-url\)/],
     [['--ai', 'ollama:m', '--ai-max-requests', 'lots'], {}, /--ai-max-requests needs a whole number/],

@@ -13,6 +13,10 @@
 //   https://docs.ollama.com/api/openai-compatibility
 //   https://lmstudio.ai/docs/developer/openai-compat
 import { resolve } from 'node:path';
+import { AGENTS, findCommand, agentBody, runAgent } from './agents.mjs';
+import { AiRequestError } from './error.mjs';
+
+export { AiRequestError };
 
 // The latest Messages API version. It only removes sampling parameters, which are not sent.
 const ANTHROPIC_VERSION = '2026-10-21';
@@ -24,9 +28,11 @@ export const PROVIDERS = {
   lmstudio: { format: 'openai', base: 'http://localhost:1234/v1' },
   ollama: { format: 'openai', base: 'http://localhost:11434/v1' },
   'openai-compatible': { format: 'openai', base: null },
+  // Coding-agent command line tools, run headless with the account they are logged in to.
+  ...Object.fromEntries(Object.keys(AGENTS).map((id) => [id, { format: 'agent' }])),
 };
 
-export const AI_DEFAULTS = { maxRequests: 50, cache: true, images: true, timeout: 180_000, retryDelay: 2000 };
+export const AI_DEFAULTS = { maxRequests: 50, cache: true, images: true, timeout: 180_000, agentTimeout: 300_000, retryDelay: 2000 };
 
 // Turns what the user asked for ("anthropic:<model>" or an object) into everything a request
 // needs. Returns { error } instead of throwing, so the CLI can report it in its own words
@@ -44,8 +50,34 @@ export function resolveAi(input, env = process.env) {
   model = String(model || '').trim();
   const known = Object.keys(PROVIDERS);
   if (!PROVIDERS[provider]) return { error: `AI provider must be one of ${known.join(', ')}, got "${provider}"` };
-  if (!model) return { error: `name the model as provider:model, for example ${provider}:<model name from your provider>` };
   const p = PROVIDERS[provider];
+  const maxRequests = given.maxRequests ?? AI_DEFAULTS.maxRequests;
+  if (!Number.isInteger(maxRequests) || maxRequests < 0) return { error: `the AI request limit must be a whole number, got ${maxRequests}` };
+  const common = {
+    provider, model, format: p.format, maxRequests,
+    cache: given.cache ?? AI_DEFAULTS.cache,
+    cacheDir: given.cacheDir || resolve('.accessready-cache', 'ai'),
+    onPlan: given.onPlan || (() => {}),
+  };
+
+  // A coding-agent CLI: the model is optional (the CLI's own default applies), there is no
+  // address or key, and the command has to be installed.
+  if (p.format === 'agent') {
+    const agent = AGENTS[provider];
+    if (given.baseUrl) return { error: `--ai-base-url does not apply to ${provider}, which runs the ${agent.bin} command` };
+    const bin = findCommand(agent.bin, env);
+    if (!bin) return { error: `${provider} runs the ${agent.bin} command (${agent.name}), which is not installed or not on PATH. Install it with: ${agent.install}. Then log in once by running ${agent.bin}.` };
+    const images = (given.images ?? AI_DEFAULTS.images) && agent.images;
+    return {
+      ai: {
+        ...common, bin, env, endpoint: `the ${agent.bin} command (${agent.name}, the account it is logged in to)`,
+        images, textOnly: !agent.images && (given.images ?? AI_DEFAULTS.images),
+        timeout: given.timeout ?? AI_DEFAULTS.agentTimeout,
+      },
+    };
+  }
+
+  if (!model) return { error: `${provider} needs provider:model, for example ${provider}:<model name from your provider>` };
 
   const base = given.baseUrl || p.base;
   if (!base) return { error: `${provider} needs a base URL (--ai-base-url), for example http://localhost:8080/v1` };
@@ -61,20 +93,13 @@ export function resolveAi(input, env = process.env) {
   const trimmed = url.href.replace(/\/+$/, '');
   const endpoint = trimmed.endsWith(path) ? trimmed : trimmed + path;
 
-  const maxRequests = given.maxRequests ?? AI_DEFAULTS.maxRequests;
-  if (!Number.isInteger(maxRequests) || maxRequests < 0) return { error: `the AI request limit must be a whole number, got ${maxRequests}` };
-
   return {
     ai: {
-      provider, model, format: p.format, endpoint, key,
+      ...common, endpoint, key,
       role: p.role || 'system', jsonMode: !!p.jsonMode,
-      maxRequests,
-      cache: given.cache ?? AI_DEFAULTS.cache,
-      cacheDir: given.cacheDir || resolve('.accessready-cache', 'ai'),
       images: given.images ?? AI_DEFAULTS.images,
       timeout: given.timeout ?? AI_DEFAULTS.timeout,
       retryDelay: given.retryDelay ?? AI_DEFAULTS.retryDelay,
-      onPlan: given.onPlan || (() => {}),
     },
   };
 }
@@ -82,6 +107,7 @@ export function resolveAi(input, env = process.env) {
 // The request body for one prompt: a system text, a user text, and pictures each labelled
 // with the item they belong to. The body is also what the cache is keyed on.
 export function requestBody(ai, { system, text, pictures = [] }) {
+  if (ai.format === 'agent') return agentBody(ai, { system, text, pictures });
   if (ai.format === 'anthropic') {
     const content = [{ type: 'text', text }];
     for (const pic of pictures) {
@@ -122,10 +148,6 @@ function readAnswer(ai, json) {
   return { text: choice?.message?.content || '', cutOff: choice?.finish_reason === 'length', refused: !!choice?.message?.refusal || choice?.finish_reason === 'content_filter', usage: { input: json?.usage?.prompt_tokens || 0, output: json?.usage?.completion_tokens || 0 } };
 }
 
-export class AiRequestError extends Error {
-  constructor(message, { fatal = false } = {}) { super(message); this.fatal = fatal; }
-}
-
 async function errorDetail(res) {
   const body = await res.text().catch(() => '');
   try {
@@ -143,6 +165,10 @@ const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 // like any other call. Errors that will repeat for every page (a refused key, an unknown
 // model, nothing listening) are marked fatal so the run stops asking.
 export async function send(ai, body, take) {
+  if (ai.format === 'agent') {
+    if (!take()) throw new AiRequestError('the AI request limit was reached');
+    return runAgent(ai, body);
+  }
   const host = new URL(ai.endpoint).host;
   for (let attempt = 0; ; attempt++) {
     if (!take()) throw new AiRequestError('the AI request limit was reached before a retry could be sent');

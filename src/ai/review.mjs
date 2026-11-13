@@ -147,7 +147,7 @@ export async function reviewWithAi(pages, opts) {
     images: waiting.reduce((n, p) => n + p.pictures.length, 0),
   });
 
-  let used = 0, stopped = null, cacheFailed = false;
+  let used = 0, stopped = null, cacheFailed = false, succeeded = false;
   const usage = { inputTokens: 0, outputTokens: 0 };
   const take = () => (used < ai.maxRequests ? (used++, true) : false);
   const notAsked = { limit: [], stopped: [] };
@@ -161,9 +161,12 @@ export async function reviewWithAi(pages, opts) {
       try {
         res = await send(ai, p.body, take);
       } catch (e) {
-        if (e.fatal) { stopped ||= e.message; return notAsked.stopped.push(p); }
+        // A tool that fails before anything has worked is most likely set up wrong; asking
+        // again for every page would only repeat the failure.
+        if (e.fatal || (e.repeatable && !succeeded)) { stopped ||= e.message; return notAsked.stopped.push(p); }
         return note(p, `the request did not succeed (${e.message}); nothing was reported`);
       }
+      succeeded = true;
       usage.inputTokens += res.usage.input;
       usage.outputTokens += res.usage.output;
       if (res.refused) return note(p, 'the model declined to answer; nothing was reported');
@@ -211,6 +214,7 @@ export async function reviewWithAi(pages, opts) {
   const verb = (list) => (list.length === 1 ? 'was' : 'were');
   if (stopped) runNotes.push(`AI review: stopped because of this answer: ${stopped}. ${describe(notAsked.stopped)} ${verb(notAsked.stopped)} not reviewed`);
   if (notAsked.limit.length) runNotes.push(`AI review: the limit of ${plural(ai.maxRequests, 'request')} was reached; ${describe(notAsked.limit)} ${verb(notAsked.limit)} not reviewed. Raise --ai-max-requests to include them`);
+  if (ai.textOnly && [...looks.values()].some((l) => l.images.length)) runNotes.push(`AI review: images were not sent, because ${ai.provider} has no documented way to take them in non-interactive mode; image descriptions were judged by their words and nearby text only`);
   if (cacheFailed) runNotes.push(`AI review: answers could not be saved in ${ai.cacheDir}, so a rerun will ask again`);
 
   return {
@@ -227,7 +231,7 @@ export async function reviewWithAi(pages, opts) {
 export function describePlan(plan) {
   const parts = [`AI review: sending the text, links, headings and form labels of ${plural(plan.pages, 'page')}`];
   if (plan.images) parts.push(` and ${plural(plan.images, 'image')}`);
-  parts.push(` to ${plan.provider} (${plan.endpoint}), model ${plan.model}.`);
+  parts.push(` to ${plan.provider} (${plan.endpoint}), ${plan.model ? `model ${plan.model}` : 'with its default model'}.`);
   parts.push(` ${plan.requests ? `About ${plural(plan.requests, 'request')}` : 'No requests'}`);
   const more = [];
   if (plan.cached) more.push(`${plan.cached} answered from the cache`);
@@ -243,7 +247,7 @@ export function renderAiConsole(result, { color = false } = {}) {
   if (!result.ai) return '';
   const wrap = (code) => (s) => (color ? `\x1b[${code}m${s}\x1b[0m` : String(s));
   const yellow = wrap(33), dim = wrap(2), bold = wrap(1), cyan = wrap(36);
-  const lines = [bold(`AI review (${result.ai.provider}, ${result.ai.model}): judgments a person should confirm`)];
+  const lines = [bold(`AI review (${result.ai.provider}, ${result.ai.model || 'default model'}): judgments a person should confirm`)];
   let any = false;
   for (const page of result.pages) {
     const found = page.issues.filter((i) => i.source === 'ai' && i.scope !== 'site');

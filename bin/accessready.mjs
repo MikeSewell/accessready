@@ -4,7 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { audit, exitCode, version, AccessReadyError, renderHtml, VIEWPORTS, BROWSERS } from '../src/index.mjs';
 import { renderPage, renderSummary } from '../src/report/console.mjs';
-import { resolveAi, PROVIDERS } from '../src/ai/providers.mjs';
+import { resolveAi } from '../src/ai/providers.mjs';
 import { describePlan, renderAiConsole } from '../src/ai/review.mjs';
 
 const HELP = `accessready ${version}
@@ -55,16 +55,25 @@ AI review (optional; you choose the provider and pay it yourself)
                          ACCESSREADY_AI_KEY is used for any provider when set. The model
                          name is the one your provider lists, for example
                          ollama:qwen2.5vl:7b.
+                         Or use a coding-agent CLI you already pay for. It runs headless
+                         with the account it is logged in to, read-only, with its file
+                         and command tools off where the CLI allows, in an empty
+                         temporary folder. The model is optional (the CLI's default):
+                           claude-code[:<model>]      Claude Code (claude)
+                           codex[:<model>]            OpenAI Codex (codex)
+                           gemini-cli[:<model>]       Gemini CLI (gemini), text only
+                           qwen-code[:<model>]        Qwen Code (qwen), text only
   --ai-base-url <url>    send AI requests here instead of the provider's usual address
+                         (API providers only)
   --ai-max-requests <n>  most AI requests in one run (default 50; 0 uses only the cache)
   --ai-no-cache          ask again instead of reusing answers kept in .accessready-cache/ai
   --ai-no-images         send no images, only text (for text-only models)
 
   The AI review sends each page's text, links, headings, form labels and images (scaled
-  down) to the provider you name. Do not use it on pages whose content must not leave
-  your machine, unless the model runs locally. Its findings are likely problems for a
-  person to confirm, marked as AI judgments; they never fail the run unless --strict is
-  set.
+  down) to the provider you name, or through the CLI you name to its service. Do not use
+  it on pages whose content must not leave your machine, unless the model runs locally.
+  Its findings are likely problems for a person to confirm, marked as AI judgments; they
+  never fail the run unless --strict is set.
 
 Exit codes
   0  no failures
@@ -139,7 +148,6 @@ for (const f of ['ai-base-url', 'ai-max-requests', 'ai-no-cache', 'ai-no-images'
   if (!flags.ai && (flags[f] !== undefined && flags[f] !== false)) fail(`--${f} needs --ai <provider:model>`);
 }
 if (flags.ai !== undefined) {
-  if (!flags.ai.includes(':')) fail(`--ai needs provider:model, for example anthropic:<model>; providers are ${Object.keys(PROVIDERS).join(', ')}`);
   const max = flags['ai-max-requests'];
   if (max !== undefined && !/^\d+$/.test(max)) fail(`--ai-max-requests needs a whole number, got "${max}"`);
   ai = {

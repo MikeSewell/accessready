@@ -72,6 +72,7 @@ export const LIMITS = { text: 6000, links: 60, headings: 40, fields: 30, images:
 // and each picture costs a few hundred tokens instead of thousands.
 const PICTURE_EDGE = 768;
 const PICTURE_BYTES = 1_500_000;
+const PICTURE_TOTAL = 6_000_000; // base64 characters across one page's pictures
 const PICTURE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
 // Runs in the page. Reads what the review needs and nothing else.
@@ -255,8 +256,14 @@ async function lookForAi(page, ctx) {
   const ai = ctx.opts.ai;
   if (!ai || ctx.viewport.name !== ai.view || ctx.browserName !== ai.engine) return [];
   const look = await page.evaluate(collect, { limits: LIMITS, edge: PICTURE_EDGE, pictures: ai.images !== false });
+  // Pictures fetched at full size are capped in total too, so one request stays well under
+  // the size limits of every provider and of the CLIs that read the prompt from stdin.
+  let bytes = look.images.reduce((n, i) => n + (i.picture?.data.length || 0), 0);
   for (const image of look.images) {
-    if (image.fetch) image.picture = await fetchPicture(page, image.src);
+    if (image.fetch && bytes < PICTURE_TOTAL) {
+      image.picture = await fetchPicture(page, image.src);
+      if (image.picture && (bytes += image.picture.data.length) > PICTURE_TOTAL) image.picture = null;
+    }
     delete image.fetch;
   }
   ctx.result.aiLook = look;
