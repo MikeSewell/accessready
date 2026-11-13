@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session with a warning</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  button { font: inherit; padding: 8px 12px; }
+  #warning { position: fixed; inset: 30% 20%; background: #fff; border: 2px solid #111; padding: 24px; }
+  #warning[hidden] { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Your account</h1>
+  <form action="clean.html"><label for="note">Note</label> <input id="note" type="text"></form>
+  <div id="warning" role="alertdialog" aria-modal="true" aria-labelledby="warning-title" hidden>
+    <h2 id="warning-title">Your session will expire in two minutes</h2>
+    <button type="button" id="stay">Stay signed in</button>
+  </div>
+</main>
+<script>
+  // Warns at thirteen minutes with a way to stay, then ends at fifteen.
+  const warning = document.getElementById("warning");
+  let end = setTimeout(expire, 15 * 60 * 1000);
+  setTimeout(() => { warning.hidden = false; document.getElementById("stay").focus(); }, 13 * 60 * 1000);
+  document.getElementById("stay").addEventListener("click", () => { warning.hidden = true; clearTimeout(end); end = setTimeout(expire, 15 * 60 * 1000); });
+  function expire() { document.querySelector("main").innerHTML = "<h1>Your session has expired</h1>"; }
+</script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Endless animation</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  button { font: inherit; padding: 8px 12px; }
+  .banner { overflow: hidden; background: #e3ecf7; padding: 8px; }
+  #marquee { display: inline-block; animation: slide 8s linear infinite; }
+  @keyframes slide { from { transform: translateX(0); } to { transform: translateX(300px); } }
+  @media (prefers-reduced-motion: reduce) { #marquee { animation: none; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Endless animation</h1>
+  <p class="banner"><span id="marquee">Donate today and double your impact</span></p>
+</main>
+
+</body>
+</html>

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Single key shortcut</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  button, input, select { font: inherit; }
+  /* Targets of 48px and a solid 3px ring, so the page passes 2.5.5 and 2.4.13 unless it
+     plants something else on purpose. */
+  .big { display: inline-block; min-width: 48px; min-height: 48px; padding: 10px 16px; box-sizing: border-box; }
+  :focus-visible { outline: 3px solid #0b4a8f; outline-offset: 2px; }
+
+</style>
+</head>
+<body>
+<main>
+  <h1>Single key shortcut</h1>
+  <p><label for="q">Search</label> <input id="q" class="big" type="search"></p>
+  <p>Press s anywhere to search.</p>
+</main>
+<script>
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 's' && !e.ctrlKey && !e.metaKey && !e.altKey && e.target === document.body) { e.preventDefault(); document.getElementById('q').focus(); }
+  });
+</script>
+</body>
+</html>

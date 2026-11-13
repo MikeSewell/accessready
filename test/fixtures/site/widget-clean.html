@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Widgets done right</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  button, input, select { font: inherit; }
+  /* Targets of 48px and a solid 3px ring, so the page passes 2.5.5 and 2.4.13 unless it
+     plants something else on purpose. */
+  .big { display: inline-block; min-width: 48px; min-height: 48px; padding: 10px 16px; box-sizing: border-box; }
+  :focus-visible { outline: 3px solid #0b4a8f; outline-offset: 2px; }
+  .skip { position: absolute; left: 16px; top: -900px; background: #fff; }
+  .skip:focus { top: 0; }
+  header { padding: 24px; }
+  .switch { position: relative; width: 72px; height: 48px; border-radius: 24px; background: #555; cursor: pointer; }
+  .knob { position: absolute; top: 6px; left: 6px; width: 36px; height: 36px; border-radius: 50%; background: #fff; }
+  .switch[aria-checked=true] { background: #0b6b2f; }
+  .switch[aria-checked=true] .knob { left: 30px; }
+  [role=tablist] { display: flex; gap: 8px; }
+  [role=tab] { min-height: 48px; padding: 10px 16px; }
+  [role=tabpanel] { padding: 16px; border: 1px solid #555; }
+  #contact { position: fixed; top: 80px; left: 80px; width: 320px; padding: 24px; background: #fff; border: 2px solid #111; }
+  #contact[hidden] { display: none; }
+  .wrap { position: relative; display: inline-block; }
+  .tip { position: absolute; left: 0; top: 100%; width: 320px; padding: 12px; background: #1c2733; color: #fff; z-index: 2; }
+  .tip[hidden] { display: none; }
+</style>
+</head>
+<body>
+<a class="skip big" href="#content">Skip to main content</a>
+<header><nav aria-label="Main"><a class="big" href="clean.html">Home</a> <a class="big" href="nav-a.html">About</a></nav></header>
+<main id="content">
+  <h1>Widgets done right</h1>
+  <p><button id="faq" class="big" type="button" aria-expanded="false" aria-controls="answer">How do I volunteer?</button></p>
+  <div id="answer" hidden><p>Sign up at the front desk.</p></div>
+  <p><span id="alerts" class="switch big" role="switch" aria-checked="false" tabindex="0" aria-label="Email alerts"><span class="knob"></span></span></p>
+  <div role="tablist" aria-label="Programs">
+    <button id="t1" role="tab" type="button" aria-selected="true" aria-controls="p1" tabindex="0">Youth</button>
+    <button id="t2" role="tab" type="button" aria-selected="false" aria-controls="p2" tabindex="-1">Seniors</button>
+  </div>
+  <div id="p1" role="tabpanel" aria-labelledby="t1"><p>Programs for young people.</p></div>
+  <div id="p2" role="tabpanel" aria-labelledby="t2" hidden><p>Programs for older people.</p></div>
+  <p><button id="open" class="big" type="button" aria-haspopup="dialog">Contact us</button></p>
+  <p><label for="sort">Sort by</label> <select id="sort" class="big"><option>Newest</option><option>Oldest</option></select>
+  <button class="big" type="button">Apply</button></p>
+  <p><span class="wrap"><button id="info" class="big" type="button" aria-describedby="info-tip">What is Gift Aid?</button><span id="info-tip" class="tip" role="tooltip" hidden>Gift Aid lets a charity claim tax back on your donation.</span></span></p>
+  <p>This paragraph sits under the tooltip. It is long enough to run under the whole tooltip while it is open.</p>
+  <p><a class="big" href="nav-b.html" target="_blank">Annual report (opens in a new tab)</a></p>
+  <p><label for="q">Search</label> <input id="q" class="big" type="search"> Press Ctrl+K to search.</p>
+</main>
+<div id="contact" role="dialog" aria-modal="true" aria-labelledby="contact-title" hidden>
+  <h2 id="contact-title">Contact us</h2>
+  <button id="close" class="big" type="button">Close</button>
+</div>
+<script>
+  const faq = document.getElementById('faq'), answer = document.getElementById('answer');
+  faq.addEventListener('click', () => { answer.hidden = !answer.hidden; faq.setAttribute('aria-expanded', String(!answer.hidden)); });
+  const sw = document.getElementById('alerts');
+  const flip = () => sw.setAttribute('aria-checked', String(sw.getAttribute('aria-checked') !== 'true'));
+  sw.addEventListener('click', flip);
+  sw.addEventListener('keydown', (e) => { if (e.key === ' ') { e.preventDefault(); flip(); } });
+  const tabs = [...document.querySelectorAll('[role=tab]')];
+  const show = (tab, setSelected) => {
+    for (const t of tabs) {
+      document.getElementById(t.getAttribute('aria-controls')).hidden = t !== tab;
+      if (setSelected) { t.setAttribute('aria-selected', String(t === tab)); t.tabIndex = t === tab ? 0 : -1; }
+    }
+  };
+  for (const t of tabs) {
+    t.addEventListener('click', () => show(t, true));
+    t.addEventListener('keydown', (e) => { if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { const n = tabs[(tabs.indexOf(t) + 1) % tabs.length]; show(n, true); n.focus(); } });
+  }
+  const open = document.getElementById('open'), dialog = document.getElementById('contact');
+  const closeDialog = () => { dialog.hidden = true; open.focus(); };
+  open.addEventListener('click', () => { dialog.hidden = false; document.getElementById('close').focus(); });
+  document.getElementById('close').addEventListener('click', closeDialog);
+  dialog.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDialog(); });
+  const wrap = document.querySelector('.wrap'), tip = document.getElementById('info-tip'), info = document.getElementById('info');
+  wrap.addEventListener('mouseenter', () => { tip.hidden = false; });
+  wrap.addEventListener('mouseleave', () => { tip.hidden = true; });
+  info.addEventListener('focus', () => { tip.hidden = false; });
+  info.addEventListener('blur', () => { tip.hidden = true; });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') tip.hidden = true;
+    if (e.key === 'k' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); document.getElementById('q').focus(); }
+  });
+</script>
+</body>
+</html>

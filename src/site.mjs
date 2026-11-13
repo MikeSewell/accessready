@@ -15,7 +15,11 @@ function navigationOrder(pages) {
     tally.set(key, (tally.get(key) || 0) + 1);
   }
   const reference = JSON.parse([...tally.entries()].sort((a, b) => b[1] - a[1])[0][0]);
-  const position = new Map(reference.map((label, i) => [label, i]));
+  // Where each label first appears. A menu can list a label twice (a Donate link and a
+  // Donate button at the end), and `shared` below keeps first occurrences too, so both sides
+  // have to count from the same one or an unchanged menu reads as reordered.
+  const position = new Map();
+  reference.forEach((label, i) => { if (!position.has(label)) position.set(label, i); });
 
   for (const p of withNav) {
     const shared = [...new Set(p.review.nav)].filter((label) => position.has(label));
@@ -59,3 +63,16 @@ export function checkAcrossPages(pages) {
   navigationOrder(audited);
   duplicateTitles(audited);
 }
+
+export const rules = {
+  'inconsistent-navigation': {
+    title: 'Navigation is in a different order on this page', criteria: ['3.2.3'], kinds: ['failure'],
+    covers: 'The main navigation is compared across every page audited; a page that lists the same links in a different order fails.',
+    why: 'People who navigate by memory or with a screen reader rely on the menu being in the same order on every page.',
+  },
+  'duplicate-title': {
+    title: 'Page title is shared with another page', criteria: ['2.4.2'], kinds: ['advice'],
+    covers: 'Different pages that share a title are noted.',
+    why: 'The page title is the first thing a screen reader announces, and it is what tabs, bookmarks and search results show.',
+  },
+};

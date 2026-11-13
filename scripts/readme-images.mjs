@@ -45,8 +45,8 @@ const terminal = shell(`<div class="win"><div class="bar"><i></i><i></i><i></i><
   .prompt { color: #7ee2a0; }`);
 
 const social = shell(`<div class="card"><p class="name">accessready</p>
-  <p class="line">WCAG 2.2 AA audit for a whole site.</p>
-  <p class="sub">Runs axe-core, then uses every page the way a keyboard user does, in real Chrome: missing focus rings, keyboard traps, hover-only menus, text too faint over photos.</p>
+  <p class="line">WCAG 2.2 audit for a whole site, A to AAA.</p>
+  <p class="sub">Runs axe-core, then uses every page the way people with disabilities do, on a phone and a desktop: focus rings, keyboard traps, forms tried with mistakes, flashing, zoom, captions, PDFs.</p>
   <pre><span class="prompt">$</span> npx accessready https://example.org</pre>
   <p class="by">Open source · MIT · by Michael Sewell</p></div>`, `
   body { width: 1280px; height: 640px; }

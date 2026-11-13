@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Disclosure state</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  button, input, select { font: inherit; }
+  /* Targets of 48px and a solid 3px ring, so the page passes 2.5.5 and 2.4.13 unless it
+     plants something else on purpose. */
+  .big { display: inline-block; min-width: 48px; min-height: 48px; padding: 10px 16px; box-sizing: border-box; }
+  :focus-visible { outline: 3px solid #0b4a8f; outline-offset: 2px; }
+
+</style>
+</head>
+<body>
+<main>
+  <h1>Disclosure state</h1>
+  <p><button id="faq" class="big" type="button" aria-expanded="false" aria-controls="answer">How do I volunteer?</button></p>
+  <div id="answer" hidden><p>Sign up at the front desk.</p></div>
+</main>
+<script>
+  // Shows and hides the answer but never updates aria-expanded.
+  const faq = document.getElementById('faq'), answer = document.getElementById('answer');
+  faq.addEventListener('click', () => { answer.hidden = !answer.hidden; });
+</script>
+</body>
+</html>

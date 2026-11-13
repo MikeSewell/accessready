@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Focus loads a page, with analytics</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Focus loads a page, with analytics</h1>
+  <p><a id="jump" href="clean.html">A link that leaves as soon as it is focused</a></p>
+</main>
+<script>
+  // An analytics script that posts every 200ms. Those writes are refused during the check,
+  // and they must not be mistaken for the page changing by itself.
+  setInterval(() => { fetch('/collect', { method: 'POST', body: 'ping' }).catch(() => {}); }, 200);
+  document.getElementById('jump').addEventListener('focus', () => { location.href = 'left.html?from=beacon'; });
+</script>
+</body>
+</html>

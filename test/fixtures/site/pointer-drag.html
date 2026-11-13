@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drag to reorder</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  button, input, select { font: inherit; }
+  /* Targets of 48px and a solid 3px ring, so the page passes 2.5.5 and 2.4.13 unless it
+     plants something else on purpose. */
+  .big { display: inline-block; min-width: 48px; min-height: 48px; padding: 10px 16px; box-sizing: border-box; }
+  :focus-visible { outline: 3px solid #0b4a8f; outline-offset: 2px; }
+  #list li { padding: 12px; border: 1px solid #555; margin: 4px 0; list-style: none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Drag to reorder</h1>
+  <ul id="list"><li draggable="true" id="a">First task</li><li draggable="true" id="b">Second task</li></ul>
+</main>
+<script>
+  let dragged = null;
+  for (const li of document.querySelectorAll('#list li')) {
+    li.addEventListener('dragstart', () => { dragged = li; });
+    li.addEventListener('drop', (e) => { e.preventDefault(); li.before(dragged); });
+    li.addEventListener('dragover', (e) => e.preventDefault());
+  }
+</script>
+</body>
+</html>

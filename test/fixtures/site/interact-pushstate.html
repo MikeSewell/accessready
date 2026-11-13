@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A button that rewrites the address</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  button { font: inherit; padding: 8px 12px; }
+  #wide-box { width: 700px; background: #e3ecf7; padding: 12px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>A button that rewrites the address</h1>
+  <!-- Like a single-page app opening a route: the address changes with history.pushState and
+       the content is swapped, with no page load for guard() to stop. -->
+  <p><button id="gallery" type="button" aria-expanded="false">Gallery</button></p>
+  <div id="wide-box">A fixed-width box</div>
+</main>
+<script>
+  document.getElementById('gallery').addEventListener('click', () => {
+    history.pushState({}, '', 'gallery-view');
+    document.querySelector('main').innerHTML = '<h1>Gallery</h1><p>Another view.</p>';
+  });
+</script>
+</body>
+</html>

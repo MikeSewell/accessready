@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pointer done right</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  button, input, select { font: inherit; }
+  /* Targets of 48px and a solid 3px ring, so the page passes 2.5.5 and 2.4.13 unless it
+     plants something else on purpose. */
+  .big { display: inline-block; min-width: 48px; min-height: 48px; padding: 10px 16px; box-sizing: border-box; }
+  :focus-visible { outline: 3px solid #0b4a8f; outline-offset: 2px; }
+  .carousel { overflow: hidden; width: 100%; max-width: 400px; border: 1px solid #555; padding: 8px; box-sizing: border-box; }
+  .track { display: flex; }
+  .slide { flex: 0 0 100%; margin: 0; padding: 24px; box-sizing: border-box; }
+  #list li { padding: 8px; border: 1px solid #555; margin: 4px 0; list-style: none; }
+  #pad { border: 1px solid #555; display: block; max-width: 100%; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Pointer done right</h1>
+  <div class="carousel" aria-roledescription="carousel" aria-label="Stories">
+    <div class="track"><p class="slide">First story</p><p class="slide">Second story</p></div>
+    <button class="big prev" type="button">Previous</button> <button class="big next" type="button">Next</button>
+  </div>
+  <ul id="list">
+    <li draggable="true">First task <button class="big" type="button">Move down</button></li>
+    <li draggable="true">Second task <button class="big" type="button">Move up</button></li>
+  </ul>
+  <p><button id="save" class="big" type="button">Save</button></p>
+  <p><button id="tap" class="big" type="button">Tap or click</button></p>
+  <canvas id="pad" width="300" height="120" tabindex="0" aria-label="Drawing area, use arrow keys"></canvas>
+  <p id="status"></p>
+</main>
+<script>
+  const status = document.getElementById('status');
+  const track = document.querySelector('.track');
+  track.addEventListener('touchstart', () => {}, { passive: true });
+  track.addEventListener('touchmove', () => {}, { passive: true });
+  for (const li of document.querySelectorAll('#list li')) li.addEventListener('dragstart', () => {});
+  document.getElementById('save').addEventListener('click', () => { status.textContent = 'Saved'; });
+  const tap = document.getElementById('tap');
+  tap.addEventListener('touchend', () => {});
+  tap.addEventListener('click', () => { status.textContent = 'Tapped'; });
+  const pad = document.getElementById('pad');
+  pad.addEventListener('pointerdown', () => {});
+  pad.addEventListener('pointermove', () => {});
+  pad.addEventListener('keydown', () => {});
+</script>
+</body>
+</html>

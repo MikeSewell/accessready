@@ -1,6 +1,7 @@
 // A single self-contained HTML file written for the person who owns the site, not only the
 // developer who fixes it. It has to pass its own audit; test/report.test.mjs checks that.
-import { criterionLabel, WHY, UNDERSTANDING } from '../wcag.mjs';
+import { criterionLabel, understandingUrl, inLevel, STANDARDS, EXTRA, CRITERIA } from '../wcag.mjs';
+import { RULES } from '../checks/index.mjs';
 import { coverage } from '../coverage.mjs';
 import { pathOf } from './console.mjs';
 
@@ -23,18 +24,19 @@ function groupByRule(pages, kind) {
 
 function ruleCard(group) {
   const { first, items, pages } = group;
-  const why = WHY[first.id] || first.description || '';
-  const link = first.helpUrl || UNDERSTANDING[first.id];
+  const why = RULES[first.id]?.why || first.description || '';
+  const link = first.helpUrl || understandingUrl(first.wcag[0]);
   const examples = items.slice(0, EXAMPLES).map(({ issue, page }) => `
         <li>
-          <p><strong>${esc(pathOf(page.url))}</strong> ${esc(issue.message)}</p>
+          <p><strong>${esc(pathOf(page.url))}</strong> ${esc(issue.message)}${issue.seenOn ? ` <span class="meta">(${esc(issue.seenOn.join(', '))} only)</span>` : ''}</p>
+          ${issue.source === 'ai' && issue.reason ? `<p class="meta">AI judgment: ${esc(issue.reason)}</p>` : ''}
           ${issue.selector ? `<pre><code>${esc(issue.selector)}</code></pre>` : ''}
           ${issue.html ? `<pre><code>${esc(issue.html)}</code></pre>` : ''}
         </li>`).join('');
   return `
-    <section class="rule">
+    <section class="rule ${first.kind}">
       <h3>${esc(first.title)}</h3>
-      <p class="meta">${esc(criterionLabel(first.wcag))} · ${plural(items.length, 'place')} on ${plural(pages.size, 'page')}</p>
+      <p class="meta">${esc(criterionLabel(first.wcag))}${(first.extra || []).map((e) => ` · ${esc(EXTRA[e])}`).join('')}${first.source === 'ai' ? ' · AI review' : ''} · ${plural(items.length, 'place')} on ${plural(pages.size, 'page')}</p>
       ${why ? `<p>${esc(why)}</p>` : ''}
       <details>
         <summary>Where it happens</summary>
@@ -145,11 +147,37 @@ function byHand(result) {
   return parts.join('\n');
 }
 
+// Read the findings against each standard: which of its requirements have an automated failure.
+function byStandard(result) {
+  const level = result.level || 'AA';
+  const failing = new Set();
+  for (const p of result.pages) for (const i of p.issues) if (i.kind === 'failure') {
+    for (const n of i.wcag) failing.add(n);
+    for (const e of i.extra || []) failing.add(e);
+  }
+  return STANDARDS.filter((s) => s.wcag.every((n) => inLevel(n, level))).map((s) => {
+    const failed = [...s.wcag, ...s.extra].filter((n) => failing.has(n));
+    return { ...s, failed, total: s.wcag.length + s.extra.length };
+  });
+}
+
 export function renderHtml(result) {
-  const cover = coverage().counts;
+  const level = result.level || 'AA';
+  const cov = coverage();
+  const inScope = cov.rows.filter((r) => inLevel(r.number, level));
+  const cover = {
+    total: inScope.length,
+    automated: inScope.filter((r) => r.status === 'checked' || r.status === 'likely' || r.status === 'ai').length,
+    guided: inScope.filter((r) => r.status === 'guided').length,
+    manual: inScope.filter((r) => r.status === 'manual'),
+  };
   const t = result.totals;
   const failures = groupByRule(result.pages, 'failure');
+  const likely = groupByRule(result.pages, 'likely');
   const advice = groupByRule(result.pages, 'advice');
+  const standards = byStandard(result);
+  const ENGINE = { chromium: 'Chrome', firefox: 'Firefox', webkit: 'WebKit (Safari)' };
+  const views = [...(result.viewports || []), ...((result.browsers || []).length ? [result.browsers.map((b) => ENGINE[b] || b).join(' and ')] : [])].join(', ');
   const date = new Date(result.finishedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
   const verdict = t.errors
@@ -160,11 +188,13 @@ export function renderHtml(result) {
 
   const rows = result.pages.map((p) => {
     const f = p.issues.filter((i) => i.kind === 'failure').length;
+    const l = p.issues.filter((i) => i.kind === 'likely').length;
     const a = p.issues.filter((i) => i.kind === 'advice').length;
     return `
           <tr>
             <th scope="row"><a href="${esc(p.url)}">${esc(pathOf(p.url))}</a></th>
             <td>${p.error ? esc(p.error) : f}</td>
+            <td>${p.error ? '' : l}</td>
             <td>${p.error ? '' : a}</td>
             <td>${p.error ? '' : p.tabStops}</td>
           </tr>`;
@@ -196,7 +226,8 @@ export function renderHtml(result) {
   .stats li { background: #10151c; border: 1px solid #2a3544; border-radius: 8px; padding: 14px 16px; }
   .stats b { display: block; font-size: 28px; line-height: 1.2; }
   .rule { background: #171e28; border: 1px solid #2a3544; border-left: 4px solid #ff9b8f; border-radius: 8px; padding: 18px 20px 8px; margin: 0 0 16px; }
-  .rule.note { border-left-color: #ffd166; }
+  .rule.advice { border-left-color: #8cc4ff; }
+  .rule.likely { border-left-color: #ffd166; }
   summary { cursor: pointer; padding: 6px 0; min-height: 24px; color: #8cc4ff; }
   .examples { padding-left: 20px; margin: 8px 0 12px; }
   .examples li { margin-bottom: 14px; }
@@ -227,44 +258,55 @@ export function renderHtml(result) {
 <header>
   <div>
     <h1>Accessibility report for ${esc(result.target.replace(/^https?:\/\//, ''))}</h1>
-    <p class="meta">${esc(date)} · checked against ${esc(result.standard)} · ${plural(t.pages, 'page')}</p>
+    <p class="meta">${esc(date)} · checked against ${esc(result.standard)} · ${plural(t.pages, 'page')}${views ? ` · ${esc(views)}` : ''}</p>
     <p class="verdict ${t.failures || t.errors ? 'bad' : 'good'}">${esc(verdict)}</p>
     <ul class="stats">
       <li><b>${t.failures}</b> problems to fix</li>
-      <li><b>${failures.length}</b> kinds of problem</li>
+      <li><b>${t.likely || 0}</b> likely problems to confirm</li>
       <li><b>${t.pages}</b> pages checked</li>
-      <li><b>${cover.checked} of ${cover.total}</b> WCAG requirements with an automated check</li>
+      <li><b>${cover.automated} of ${cover.total}</b> WCAG ${esc(level)} requirements with an automated check</li>
     </ul>
   </div>
 </header>
 <main>
   <h2>What this report is</h2>
-  <p>Each page was opened in Chrome and tested two ways. First with axe-core, a widely used set of accessibility rules that covers things like color contrast, missing labels and image descriptions. Then by using the page the way someone who cannot use a mouse does: pressing the Tab key through every link and button, opening menus from the keyboard, widening the text spacing and narrowing the window.</p>
+  <p>Each page was opened in a real browser${views ? ` (${esc(views)})` : ''} and tested two ways. First with axe-core, a widely used set of accessibility rules that covers things like color contrast, missing labels and image descriptions. Then by using the page the way people with disabilities do: pressing the Tab key through every link and button, opening menus and popups from the keyboard, trying forms with mistakes (with nothing sent to the site), widening the text spacing, zooming, turning a phone sideways and letting time pass.</p>
+  <p><strong>Problems to fix</strong> are certain. <strong>Likely problems</strong> are where the checks found strong evidence that a person should confirm.</p>
   <p>Automated checks find some accessibility problems, not all of them. A clean report is a good sign. It is not proof that a site meets WCAG or any law.</p>
 
   <h2>What to fix</h2>
   ${failures.length ? failures.map(ruleCard).join('') : '<p>The automated checks found nothing to fix.</p>'}
 
+  ${likely.length ? `<h2>Likely problems to confirm</h2>
+  <p>The checks found strong evidence of each of these. A person should look at each one before it is fixed or dismissed.</p>
+  ${likely.map(ruleCard).join('')}` : ''}
+
   ${advice.length ? `<h2>Worth improving</h2>
   <p>These are recognized good practice. They are not WCAG failures.</p>
-  ${advice.map(ruleCard).join('').replaceAll('class="rule"', 'class="rule note"')}` : ''}
+  ${advice.map(ruleCard).join('')}` : ''}
+
+  <h2>By standard</h2>
+  <p>Laws and procurement rules name a version of WCAG, sometimes with more on top. This is what the automated checks found against each.</p>
+  <table>
+    <thead><tr><th scope="col">Standard</th><th scope="col">Requirements with an automated failure</th></tr></thead>
+    <tbody>${standards.map((s) => `
+          <tr>
+            <th scope="row">${esc(s.name)}<br><span class="meta">${esc(s.basis)}</span></th>
+            <td>${s.failed.length ? `${s.failed.length} of ${s.total}: ${esc(s.failed.map((n) => (CRITERIA[n] ? `${n} ${CRITERIA[n].name}` : EXTRA[n])).join('; '))}` : `None of ${s.total}`}</td>
+          </tr>`).join('')}
+    </tbody>
+  </table>
 
   <h2>Check these by hand</h2>
   <p>No tool can tell whether a description makes sense or a form is usable. This is everything on the site that needs a person's judgment, gathered in one place.</p>
   ${byHand(result)}
   <h3>What is not listed anywhere</h3>
-  <p>Of the ${cover.total} WCAG 2.2 A and AA requirements, this audit has automated checks for ${cover.checked} and lists what to review for ${cover.guided} more. The other ${cover.manual} need a person and cannot be listed in advance, among them:</p>
-  <ul class="plain">
-    <li>How the site sounds in a screen reader such as VoiceOver or NVDA.</li>
-    <li>Whether custom widgets, such as sliders, carousels and drag and drop, work from the keyboard.</li>
-    <li>Whether status messages (&ldquo;added to cart&rdquo;, &ldquo;3 results&rdquo;) are announced.</li>
-    <li>Whether anything flashes, times out, or changes just because it received focus.</li>
-  </ul>
+  <p>Of the ${cover.total} WCAG 2.2 ${esc(level)} requirements, this audit has automated checks for ${cover.automated} and lists what to review for ${cover.guided} more.${cover.manual.length ? ` These ${cover.manual.length} need a person and cannot be listed in advance: ${esc(cover.manual.map((r) => `${r.number} ${r.name}`).join('; '))}.` : ''} Even a requirement with an automated check is never fully covered by it, and how the site sounds in a screen reader such as VoiceOver or NVDA always needs a person.</p>
   <p><a href="https://github.com/MikeSewell/accessready/blob/main/docs/COVERAGE.md">See the full list, requirement by requirement</a>.</p>
 
   <h2>Pages checked</h2>
   <table>
-    <thead><tr><th scope="col">Page</th><th scope="col">Problems</th><th scope="col">Notes</th><th scope="col">Tab stops</th></tr></thead>
+    <thead><tr><th scope="col">Page</th><th scope="col">Problems</th><th scope="col">Likely</th><th scope="col">Notes</th><th scope="col">Tab stops</th></tr></thead>
     <tbody>${rows}
     </tbody>
   </table>

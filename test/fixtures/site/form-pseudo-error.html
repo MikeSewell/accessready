@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Error drawn by CSS</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main, footer { padding: 24px; }
+  a { color: #0b4a8f; }
+  label { display: block; margin-top: 12px; }
+  input, button, textarea, select { font: inherit; padding: 8px 12px; margin: 4px 0; border: 1px solid #555; }
+  .error { color: #a00; }
+  .row.has-error::after { content: "Enter your name"; display: block; color: #a00; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Volunteer sign-up</h1>
+  <p>Leave your name and we will call you back.</p>
+  <form id="f" action="/submit" method="post" novalidate>
+    <div class="row">
+      <label for="name">Name (required)</label>
+      <input id="name" name="name" type="text" autocomplete="name" required>
+    </div>
+    <button type="submit">Send</button>
+  </form>
+</main>
+<script>  // The message is drawn by CSS on the field's wrapper; it is on screen but tied to nothing.
+  document.getElementById('f').addEventListener('submit', (e) => {
+    const name = document.getElementById('name');
+    if (name.value) return;
+    e.preventDefault();
+    name.setAttribute('aria-invalid', 'true');
+    name.parentElement.classList.add('has-error');
+    name.focus();
+  });</script>
+</body>
+</html>

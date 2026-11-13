@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live stream</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  button { font: inherit; padding: 8px 12px; }
+  section { margin-bottom: 24px; }
+  video, audio { max-width: 100%; height: auto; }
+  :focus-visible { outline: 3px solid #0b4a8f; outline-offset: 2px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Live stream</h1>
+  <section>
+    <h2>Board meeting, live</h2>
+    <video id="live" width="320" height="180" controls muted></video>
+    <canvas id="source" width="160" height="90" hidden></canvas>
+  </section>
+</main>
+<script>
+  // A live stream with no end, as a camera or a streaming server would give.
+  const canvas = document.getElementById("source"), g = canvas.getContext("2d");
+  let n = 0;
+  setInterval(() => { g.fillStyle = n++ % 2 ? "#1c2733" : "#22303f"; g.fillRect(0, 0, 160, 90); }, 500);
+  const video = document.getElementById("live");
+  video.srcObject = canvas.captureStream(10);
+  video.play();
+</script>
+</body>
+</html>

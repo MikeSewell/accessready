@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Buttons without a type</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main, header { padding: 24px; }
+  a { color: #0b4a8f; }
+  button, input { font: inherit; padding: 8px 12px; }
+  #search-dialog { position: fixed; top: 80px; left: 80px; width: 320px; padding: 24px; background: #fff; border: 2px solid #111; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <!-- WordPress themes write menu toggles as <button> with no type attribute and no form.
+       Such a button is type "submit" in the DOM but submits nothing. -->
+  <button id="menu-toggle" aria-expanded="false" aria-controls="primary-menu">Menu</button>
+  <ul id="primary-menu" hidden><li><a href="clean.html">Home</a></li><li><a href="clean.html">About</a></li></ul>
+  <button id="search-toggle" aria-expanded="false" aria-controls="search-dialog">Search</button>
+  <div id="search-dialog" role="dialog" aria-modal="true" aria-label="Search the site" hidden>
+    <button id="search-close">Close</button>
+  </div>
+</header>
+<main>
+  <h1>Buttons without a type</h1>
+  <!-- This one is inside a form, so it really is a submit button: it must never be pressed. -->
+  <form action="left.html"><p><button id="send" aria-expanded="false">Send</button></p></form>
+</main>
+<script>
+  // Shows the menu but never updates aria-expanded (4.1.2).
+  const menu = document.getElementById('menu-toggle'), list = document.getElementById('primary-menu');
+  menu.addEventListener('click', () => { list.hidden = !list.hidden; });
+  // Opens a dialog and leaves focus on the button behind it.
+  const search = document.getElementById('search-toggle'), dialog = document.getElementById('search-dialog');
+  const set = (open) => { dialog.hidden = !open; search.setAttribute('aria-expanded', String(open)); };
+  search.addEventListener('click', () => set(search.getAttribute('aria-expanded') !== 'true'));
+  document.getElementById('search-close').addEventListener('click', () => set(false));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') set(false); });
+</script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Label that says nothing</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main, footer { padding: 24px; }
+  a { color: #0b4a8f; }
+  label { display: block; margin-top: 12px; }
+  input, button, textarea, select { font: inherit; padding: 8px 12px; margin: 4px 0; border: 1px solid #555; }
+  .error { color: #a00; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Feedback</h1>
+  <p>Tell us what went well and what did not.</p>
+  <form action="/submit-get">
+    <label for="c1">Field 1</label>
+    <textarea id="c1" name="good"></textarea>
+    <button type="submit">Send</button>
+  </form>
+</main>
+</body>
+</html>

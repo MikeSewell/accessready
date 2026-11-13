@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scripts that load on interaction</title>
+<style>body { margin: 0; padding: 24px; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }</style>
+</head>
+<body>
+<main>
+  <h1>News</h1>
+  <p>Like many analytics and chat loaders, this page adds a tag to its head every time a key
+  is pressed. Nothing on screen changes, so it is not a single-key shortcut.</p>
+  <p><a href="clean.html">Back to the start</a></p>
+</main>
+<script>
+  document.addEventListener('keydown', () => {
+    const tag = document.createElement('meta');
+    tag.name = 'interaction';
+    tag.content = String(Date.now());
+    document.head.append(tag);
+  });
+</script>
+</body>
+</html>

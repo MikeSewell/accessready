@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Error that does not help</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main, footer { padding: 24px; }
+  a { color: #0b4a8f; }
+  label { display: block; margin-top: 12px; }
+  input, button, textarea, select { font: inherit; padding: 8px 12px; margin: 4px 0; border: 1px solid #555; }
+  .error { color: #a00; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Newsletter</h1>
+  <p>One email a month about our work.</p>
+  <form id="f" action="/submit" method="post" novalidate>
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" autocomplete="email" aria-describedby="email-error">
+    <span id="email-error" class="error"></span>
+    <button type="submit">Subscribe</button>
+  </form>
+</main>
+<script>  document.getElementById('f').addEventListener('submit', (e) => {
+    const email = document.getElementById('email');
+    if (!email.value || email.value.includes('@')) return;
+    e.preventDefault();
+    email.setAttribute('aria-invalid', 'true');
+    document.getElementById('email-error').textContent = 'Invalid';
+    email.focus();
+  });</script>
+</body>
+</html>

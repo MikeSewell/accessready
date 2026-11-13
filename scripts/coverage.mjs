@@ -5,6 +5,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { coverage, STATUS_LABEL } from '../src/coverage.mjs';
+import { RULES } from '../src/checks/index.mjs';
 
 const START = '<!-- coverage:start -->', END = '<!-- coverage:end -->';
 const cell = (s) => String(s).replace(/\|/g, '\\|');
@@ -15,18 +16,24 @@ export function renderCoverageDoc() {
     r.tests,
     r.axeRules.length ? `axe-core: ${r.axeRules.map((id) => `\`${id}\``).join(', ')}.` : '',
     r.own.length ? `accessready: ${r.own.map((id) => `\`${id}\``).join(', ')}.` : '',
+    // The optional AI review is named apart, so nobody reads it as a machine check.
+    r.ai.length ? `With --ai: ${r.ai.map((id) => RULES[id].covers).join(' ')} AI review: ${r.ai.map((id) => `\`${id}\``).join(', ')}.` : '',
   ].filter(Boolean).join(' ');
   return `# WCAG 2.2 coverage
 
-What accessready does about each of the ${counts.total} level A and AA success criteria in WCAG 2.2. Generated from \`src/coverage.mjs\` and axe-core ${axeVersion}; do not edit by hand.
+What accessready does about each of the ${counts.total} success criteria in WCAG 2.2, levels A, AA and AAA. Generated from \`src/coverage.mjs\` and axe-core ${axeVersion}; do not edit by hand.
 
-| | Criteria | What it means |
-|---|---|---|
-| **${STATUS_LABEL.checked}** | ${counts.checked} | At least one automated check can fail a page on this. It never covers the whole criterion; the last column says what is left. |
-| **${STATUS_LABEL.guided}** | ${counts.guided} | Nothing is judged automatically, but the HTML report lists exactly what a person has to look at. |
-| **${STATUS_LABEL.manual}** | ${counts.manual} | No tool support. A person has to test it. |
+${summaryTable()}
 
-No automated tool can establish that a site conforms to WCAG. This table is here so you can see what a clean run does and does not tell you.
+| Status | What it means |
+|---|---|
+| **${STATUS_LABEL.checked}** | At least one automated check can fail a page on this. It never covers the whole criterion; the last column says what is left. |
+| **${STATUS_LABEL.likely}** | Automated checks find evidence of a failure, reported as a likely problem for a person to confirm. |
+| **${STATUS_LABEL.ai}** | Only the optional AI review (\`--ai\`, with a model or coding agent you choose) judges this. Its findings are for a person to confirm. |
+| **${STATUS_LABEL.guided}** | Nothing is judged automatically, but the HTML report lists exactly what a person has to look at. |
+| **${STATUS_LABEL.manual}** | No tool support. A person has to test it. |
+
+AA is checked by default; \`--level AAA\` adds the AAA criteria. No automated tool can establish that a site conforms to WCAG. This table is here so you can see what a clean run does and does not tell you.
 
 | Criterion | Level | Status | What is tested automatically | What a person still checks |
 |---|---|---|---|---|
@@ -34,14 +41,20 @@ ${rows.map((r) => `| ${r.number} ${cell(r.name)} | ${r.level} | ${STATUS_LABEL[r
 `;
 }
 
+// Criteria per status and level, as a table.
+function summaryTable() {
+  const { counts, countAt } = coverage();
+  const lines = ['| Of the 86 WCAG 2.2 criteria | A | AA | AAA | All |', '|---|---|---|---|---|'];
+  for (const [status, label] of Object.entries(STATUS_LABEL)) {
+    if (!counts[status]) continue;
+    lines.push(`| ${label} | ${countAt(status, 'A')} | ${countAt(status, 'AA')} | ${countAt(status, 'AAA')} | ${counts[status]} |`);
+  }
+  return lines.join('\n');
+}
+
 export function renderReadmeBlock() {
-  const { counts } = coverage();
   return `${START}
-| Of the ${counts.total} WCAG 2.2 A and AA criteria | |
-|---|---|
-| ${counts.checked} | have at least one automated check that can fail a page |
-| ${counts.guided} | are not judged, but the HTML report lists exactly what a person has to look at |
-| ${counts.manual} | need a person, with no help from the tool |
+${summaryTable()}
 ${END}`;
 }
 
@@ -57,5 +70,5 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   writeFileSync(docs, renderCoverageDoc());
   writeFileSync(readme, withCoverageBlock(readFileSync(readme, 'utf8')));
   const { counts } = coverage();
-  console.log(`wrote docs/COVERAGE.md and the README block: ${counts.checked} checked, ${counts.guided} listed for review, ${counts.manual} by hand`);
+  console.log(`wrote docs/COVERAGE.md and the README block: ${Object.entries(STATUS_LABEL).map(([s, l]) => `${counts[s]} ${l.toLowerCase()}`).join(', ')}`);
 }

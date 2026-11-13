@@ -1,16 +1,22 @@
 // Checks that operate the page the way a keyboard user would: things that can be clicked
 // but not reached, menus that only open on hover, and buttons that only answer the mouse.
-// These change the page's state, so they run after everything that only looks.
+// These change the page's state, so they run after everything that only looks. They run on
+// the page the other checks use, so the menu and button checks run behind guard(): a key
+// press that would load another page is answered with "no content" and the page stays.
+import { guard } from './observe.mjs';
 
 const MAX_MENUS = 8;
 const MAX_DISCLOSURES = 8;
 const PAUSE = 250;
+// Something only a mouse can do fails 2.1.1, and 2.1.3 too: 2.1.3 is 2.1.1 without the
+// exception for path-dependent input, so every 2.1.1 failure here is also one of 2.1.3.
+const KEYBOARD = ['2.1.1', '2.1.3'];
 
 // 2.1.1 Keyboard. Two strengths of evidence:
 //   failure: the element says it is a control (role, onclick) and cannot take keyboard focus
 //   note:    the element only looks clickable (pointer cursor); a person should confirm
 export async function checkUnreachable(page) {
-  return page.evaluate(() => {
+  return page.evaluate((KEYBOARD) => {
     const out = [];
     const shown = (el) => { const r = el.getBoundingClientRect(); const cs = getComputedStyle(el); return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none' && +cs.opacity > 0; };
     const FOCUSABLE = 'a[href], button, input, select, textarea, summary, iframe, audio[controls], video[controls], [contenteditable=""], [contenteditable=true], [tabindex]:not([tabindex^="-"])';
@@ -33,7 +39,7 @@ export async function checkUnreachable(page) {
       return parts.join(' > ');
     };
     const issue = (el, kind, message) => ({
-      id: kind === 'failure' ? 'keyboard-unreachable' : 'looks-clickable', source: 'accessready', kind, wcag: ['2.1.1'],
+      id: kind === 'failure' ? 'keyboard-unreachable' : 'looks-clickable', source: 'accessready', kind, wcag: KEYBOARD,
       impact: kind === 'failure' ? 'critical' : 'moderate',
       title: kind === 'failure' ? 'Control cannot be reached with the keyboard' : 'Looks clickable but cannot be reached with the keyboard',
       message, selector: selector(el), html: el.outerHTML.replace(/\s+/g, ' ').slice(0, 160),
@@ -55,7 +61,7 @@ export async function checkUnreachable(page) {
       out.push(issue(el, 'advice', `${el.tagName.toLowerCase()} "${text(el)}" shows a pointer cursor but Tab never reaches it; if clicking it does something, keyboard users cannot do it`));
     }
     return out;
-  });
+  }, KEYBOARD);
 }
 
 // Marks submenus in navigation that are hidden until something reveals them, and returns
@@ -91,6 +97,11 @@ function menuState(index) {
 // 2.1.1 Keyboard: a submenu that opens when the mouse hovers but not when the keyboard
 // focuses it leaves every link inside it out of reach.
 export async function checkHoverMenus(page) {
+  const g = await guard(page, { writes: true });
+  try { return await hoverMenus(page); } finally { await g.stop(); }
+}
+
+async function hoverMenus(page) {
   const issues = [];
   const count = Math.min(await page.evaluate(markHiddenMenus), MAX_MENUS);
   for (let i = 0; i < count; i++) {
@@ -130,7 +141,7 @@ export async function checkHoverMenus(page) {
 
     const hiddenLinks = hovered.visible - before.visible;
     issues.push({
-      id: 'hover-only-menu', source: 'accessready', kind: 'failure', wcag: ['2.1.1'], impact: 'critical',
+      id: 'hover-only-menu', source: 'accessready', kind: 'failure', wcag: KEYBOARD, impact: 'critical',
       title: 'Menu opens on mouse hover only',
       message: `the menu under "${before.label}" opens when the mouse hovers over it but not from the keyboard, so ${hiddenLinks} link${hiddenLinks === 1 ? '' : 's'} cannot be reached without a mouse`,
       selector: `nav item "${before.label}"`, html: before.html,
@@ -143,9 +154,12 @@ export async function checkHoverMenus(page) {
 function markDisclosures() {
   const shown = (el) => { const r = el.getBoundingClientRect(); const cs = getComputedStyle(el); return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none' && +cs.opacity > 0; };
   let n = 0;
-  // Buttons only: pressing Enter on a link or a submit button would leave the page.
+  // Not a button that submits a form. A <button> with no type is "submit" even outside a
+  // form, where it submits nothing (WordPress menu toggles are written that way), so what
+  // counts is whether it belongs to a form. A link with role="button" is kept: guard()
+  // stops it leaving the page, and checkDisclosures skips it if a key press tries to.
   for (const el of document.querySelectorAll('button[aria-expanded="false"], [role=button][aria-expanded="false"]')) {
-    if (!shown(el) || el.disabled || el.getAttribute('aria-disabled') === 'true' || el.type === 'submit') continue;
+    if (!shown(el) || el.disabled || el.getAttribute('aria-disabled') === 'true' || (el.form && el.type === 'submit')) continue;
     el.setAttribute('data-accessready-toggle', String(n++));
   }
   return n;
@@ -168,6 +182,11 @@ function toggleState(index) {
 // 2.1.1 Keyboard: a button that announces it opens something (aria-expanded) has to open it
 // from the keyboard, not only on click. Also notes a dialog that opens without taking focus.
 export async function checkDisclosures(page) {
+  const g = await guard(page, { writes: true });
+  try { return await disclosures(page, g); } finally { await g.stop(); }
+}
+
+async function disclosures(page, g) {
   const issues = [];
   const notes = [];
   const startUrl = page.url();
@@ -181,13 +200,18 @@ export async function checkDisclosures(page) {
 
     if (!(await el.focus({ timeout: 2000 }).then(() => true, () => false))) continue;
     let opened = false;
+    const loads = g.navigations().length;
     for (const key of ['Enter', 'Space']) {
       await page.keyboard.press(key);
       await page.waitForTimeout(PAUSE);
-      if (page.url() !== startUrl) break;
+      if (page.url() !== startUrl || g.navigations().length > loads) break;
       if ((opened = (await state())?.expanded ?? false)) break;
     }
-    if (page.url() !== startUrl) { notes.push('a button navigated away while being tested; the remaining buttons on this page were not operated'); break; }
+    // A script that rewrites the address (history.pushState) has changed what is on screen.
+    if (page.url() !== startUrl) { notes.push('a button changed the page address while being tested; the remaining buttons on this page were not operated'); break; }
+    // The key tried to load another page, which guard() stopped: this is a link, not a button
+    // that opens something here, so it has nothing to fail.
+    if (g.navigations().length > loads) continue;
 
     if (!opened) {
       // Only a failure if the mouse can do what the keyboard could not.
@@ -195,7 +219,7 @@ export async function checkDisclosures(page) {
       await page.waitForTimeout(PAUSE);
       if ((await state())?.expanded) {
         issues.push({
-          id: 'keyboard-activation', source: 'accessready', kind: 'failure', wcag: ['2.1.1'], impact: 'critical',
+          id: 'keyboard-activation', source: 'accessready', kind: 'failure', wcag: KEYBOARD, impact: 'critical',
           title: 'Button works with the mouse but not the keyboard',
           message: `"${before.label}" opens when clicked but not when Enter or Space is pressed`,
           ...where,
@@ -228,3 +252,31 @@ export async function checkDisclosures(page) {
   await page.evaluate(() => document.querySelectorAll('[data-accessready-toggle]').forEach((el) => el.removeAttribute('data-accessready-toggle'))).catch(() => {});
   return { issues, notes };
 }
+
+export const rules = {
+  'keyboard-unreachable': {
+    title: 'Control cannot be reached with the keyboard', criteria: KEYBOARD, kinds: ['failure'],
+    covers: 'Controls with a click handler or an interactive role that the Tab key never reaches.',
+    why: 'People who cannot use a mouse reach every control with the Tab key. A control that Tab skips does not exist for them.',
+  },
+  'looks-clickable': {
+    title: 'Looks clickable but cannot be reached with the keyboard', criteria: KEYBOARD, kinds: ['advice'],
+    covers: 'Elements with a pointer cursor that Tab never reaches are noted for a person to try.',
+    why: 'If this does something when clicked, people who cannot use a mouse have no way to do it.',
+  },
+  'hover-only-menu': {
+    title: 'Menu opens on mouse hover only', criteria: KEYBOARD, kinds: ['failure'],
+    covers: 'Navigation menus are hovered, then the same is tried from the keyboard.',
+    why: 'A menu that only opens when a mouse hovers over it hides every page inside it from keyboard and many touch-screen users.',
+  },
+  'keyboard-activation': {
+    title: 'Button works with the mouse but not the keyboard', criteria: KEYBOARD, kinds: ['failure'],
+    covers: 'Buttons that open something are pressed with Enter and Space as well as clicked.',
+    why: 'Keyboard users press Enter or Space where mouse users click. A control that ignores both is a dead end for them.',
+  },
+  'dialog-focus': {
+    title: 'Dialog opens without taking keyboard focus', criteria: ['2.4.3'], kinds: ['advice'],
+    covers: 'A dialog that opens without taking keyboard focus is noted.',
+    why: 'When a dialog opens and focus stays behind it, a screen reader user is not told it opened, and a keyboard user has to hunt for it.',
+  },
+};

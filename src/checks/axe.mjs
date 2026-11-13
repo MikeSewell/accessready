@@ -3,7 +3,12 @@
 // tested than anything hand-written here would be.
 import { AxeBuilder } from '@axe-core/playwright';
 
-const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
+// axe-core tags its rules by WCAG version and level. The level asked for decides which run.
+const TAGS = {
+  A: ['wcag2a', 'wcag21a', 'wcag22a'],
+  AA: ['wcag2a', 'wcag21a', 'wcag22a', 'wcag2aa', 'wcag21aa', 'wcag22aa'],
+  AAA: ['wcag2a', 'wcag21a', 'wcag22a', 'wcag2aa', 'wcag21aa', 'wcag22aa', 'wcag2aaa', 'wcag21aaa', 'wcag22aaa'],
+};
 
 // 'wcag143' -> '1.4.3', 'wcag2411' -> '2.4.11'
 const criteria = (tags) => tags
@@ -11,7 +16,8 @@ const criteria = (tags) => tags
   .filter(Boolean)
   .map((m) => `${m[1]}.${m[2]}.${m[3]}`);
 
-export async function runAxe(page) {
+export async function runAxe(page, level = 'AA') {
+  const WCAG_TAGS = TAGS[level];
   const results = await new AxeBuilder({ page })
     // The wcag22aa tag matters: target-size (2.5.8) is off in axe-core unless it is asked for.
     .withTags([...WCAG_TAGS, 'best-practice'])

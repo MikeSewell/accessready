@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Focus opens a dialog</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  button, input, select { font: inherit; }
+  /* Targets of 48px and a solid 3px ring, so the page passes 2.5.5 and 2.4.13 unless it
+     plants something else on purpose. */
+  .big { display: inline-block; min-width: 48px; min-height: 48px; padding: 10px 16px; box-sizing: border-box; }
+  :focus-visible { outline: 3px solid #0b4a8f; outline-offset: 2px; }
+  #offer { position: fixed; inset: 0; background: #fff; border: 4px solid #111; padding: 24px; }
+  #offer[hidden] { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Focus opens a dialog</h1>
+  <p><a class="big" href="clean.html">An ordinary link</a></p>
+  <p><label for="email">Email</label> <input id="email" class="big" type="email" autocomplete="email"></p>
+</main>
+<div id="offer" role="dialog" aria-modal="true" aria-labelledby="offer-title" hidden>
+  <h2 id="offer-title">Join our newsletter</h2>
+  <button id="offer-close" class="big" type="button">Close</button>
+</div>
+<script>
+  // Focusing the field puts up a dialog and moves focus into it.
+  const offer = document.getElementById('offer');
+  document.getElementById('email').addEventListener('focus', () => { if (offer.dataset.shown) return; offer.dataset.shown = '1'; offer.hidden = false; document.getElementById('offer-close').focus(); });
+  document.getElementById('offer-close').addEventListener('click', () => { offer.hidden = true; });
+</script>
+</body>
+</html>

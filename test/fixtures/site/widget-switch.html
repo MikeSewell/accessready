@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Switch state</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  button, input, select { font: inherit; }
+  /* Targets of 48px and a solid 3px ring, so the page passes 2.5.5 and 2.4.13 unless it
+     plants something else on purpose. */
+  .big { display: inline-block; min-width: 48px; min-height: 48px; padding: 10px 16px; box-sizing: border-box; }
+  :focus-visible { outline: 3px solid #0b4a8f; outline-offset: 2px; }
+  .switch { position: relative; width: 72px; height: 48px; border-radius: 24px; background: #555; cursor: pointer; }
+  .knob { position: absolute; top: 6px; left: 6px; width: 36px; height: 36px; border-radius: 50%; background: #fff; }
+  .switch.on { background: #0b6b2f; }
+  .switch.on .knob { left: 30px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Switch state</h1>
+  <p><span id="alerts" class="switch big" role="switch" aria-checked="false" tabindex="0" aria-label="Email alerts"><span class="knob"></span></span></p>
+</main>
+<script>
+  // Moves its knob but never updates aria-checked.
+  const sw = document.getElementById('alerts');
+  const flip = () => sw.classList.toggle('on');
+  sw.addEventListener('click', flip);
+  sw.addEventListener('keydown', (e) => { if (e.key === ' ') { e.preventDefault(); flip(); } });
+</script>
+</body>
+</html>

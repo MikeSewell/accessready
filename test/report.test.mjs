@@ -10,22 +10,22 @@ const reports = {};
 
 before(async () => {
   site = await startSite({ '/report-failing': () => reports.failing, '/report-clean': () => reports.clean });
-  failing = await audit(site.origin, { paths: ['/focus.html', '/rules.html', '/headings.html', '/obscured.html', '/inventory.html', '/overimage.html', '/video.html', '/nav-a.html', '/nav-c.html', '/nope.html'] });
-  clean = await audit(`${site.origin}/clean.html`);
+  failing = await audit(site.origin, { viewports: ['desktop'], paths: ['/focus.html', '/rules.html', '/headings.html', '/obscured.html', '/inventory.html', '/overimage.html', '/video.html', '/nav-a.html', '/nav-c.html', '/nope.html'] });
+  clean = await audit(`${site.origin}/clean.html`, { viewports: ['desktop'] });
   reports.failing = renderHtml(failing);
   reports.clean = renderHtml(clean);
 });
 after(() => site.close());
 
 test('the report passes its own audit when it lists problems', async () => {
-  const r = await audit(`${site.origin}/report-failing`);
+  const r = await audit(`${site.origin}/report-failing`, { viewports: ['desktop'] });
   assert.deepEqual(r.pages[0].issues, []);
   assert.equal(r.pages[0].error, null);
   assert.ok(r.pages[0].tabStops > 5, 'links and disclosure controls are reachable by keyboard');
 });
 
 test('the report passes its own audit when there is nothing to fix', async () => {
-  const r = await audit(`${site.origin}/report-clean`);
+  const r = await audit(`${site.origin}/report-clean`, { viewports: ['desktop'] });
   assert.deepEqual(r.pages[0].issues, []);
   assert.match(reports.clean, /The automated checks found nothing to fix\./);
   assert.match(reports.clean, /No problems found by the automated checks/);
@@ -42,7 +42,8 @@ test('the report groups problems by rule and escapes page content', () => {
 
 test('console output lists every page and a failures-by-rule table', () => {
   const out = renderConsole(failing);
-  assert.match(out, /^\/focus\.html {2}1 failure {2}1 best-practice note {2}5 tab stops$/m);
+  // The likely problem is the pale wrapper ring on focus.html, flagged under 1.4.11.
+  assert.match(out, /^\/focus\.html {2}1 failure {2}1 likely problem {2}1 best-practice note {2}5 tab stops$/m);
   assert.match(out, /^Failures by rule$/m);
   assert.match(out, /1 page could not be audited/);
   assert.doesNotMatch(out, /\x1b\[/, 'no color codes unless asked for');

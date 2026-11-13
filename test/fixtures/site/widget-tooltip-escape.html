@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tooltip without Escape</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  button, input, select { font: inherit; }
+  /* Targets of 48px and a solid 3px ring, so the page passes 2.5.5 and 2.4.13 unless it
+     plants something else on purpose. */
+  .big { display: inline-block; min-width: 48px; min-height: 48px; padding: 10px 16px; box-sizing: border-box; }
+  :focus-visible { outline: 3px solid #0b4a8f; outline-offset: 2px; }
+  .wrap { position: relative; display: inline-block; }
+  .tip { position: absolute; left: 0; top: 100%; width: 320px; padding: 12px; background: #1c2733; color: #fff; z-index: 2; }
+  .tip[hidden] { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Tooltip without Escape</h1>
+  <p><span class="wrap"><button id="info" class="big" type="button" aria-describedby="info-tip">What is Gift Aid?</button><span id="info-tip" class="tip" role="tooltip" hidden>Gift Aid lets a charity claim tax back on your donation.</span></span></p>
+  <p>This paragraph sits under the tooltip, so the tooltip covers it while it is open. It is long enough to run under the whole tooltip.</p>
+</main>
+<script>
+  // Stays while the pointer is on the button or the tooltip, but Escape does nothing.
+  const wrap = document.querySelector('.wrap'), tip = document.getElementById('info-tip'), info = document.getElementById('info');
+  wrap.addEventListener('mouseenter', () => { tip.hidden = false; });
+  wrap.addEventListener('mouseleave', () => { tip.hidden = true; });
+  info.addEventListener('focus', () => { tip.hidden = false; });
+  info.addEventListener('blur', () => { tip.hidden = true; });
+</script>
+</body>
+</html>
