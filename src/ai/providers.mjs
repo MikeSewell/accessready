@@ -70,7 +70,7 @@ export function resolveAi(input, env = process.env) {
     const images = (given.images ?? AI_DEFAULTS.images) && agent.images;
     return {
       ai: {
-        ...common, bin, env, endpoint: `the ${agent.bin} command (${agent.name}, the account it is logged in to)`,
+        ...common, bin, env, endpoint: `${agent.name}, the ${agent.bin} command, with the account it is logged in to`,
         images, textOnly: !agent.images && (given.images ?? AI_DEFAULTS.images),
         timeout: given.timeout ?? AI_DEFAULTS.agentTimeout,
       },
@@ -142,7 +142,8 @@ function headers(ai) {
 function readAnswer(ai, json) {
   if (ai.format === 'anthropic') {
     const text = (json?.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('');
-    return { text, cutOff: json?.stop_reason === 'max_tokens', refused: json?.stop_reason === 'refusal', usage: { input: json?.usage?.input_tokens || 0, output: json?.usage?.output_tokens || 0 } };
+    return { text, cutOff: json?.stop_reason === 'max_tokens', refused: json?.stop_reason === 'refusal', // Tokens served from or written to the prompt cache are counted apart from input_tokens.
+      usage: { input: (json?.usage?.input_tokens || 0) + (json?.usage?.cache_read_input_tokens || 0) + (json?.usage?.cache_creation_input_tokens || 0), output: json?.usage?.output_tokens || 0 } };
   }
   const choice = json?.choices?.[0];
   return { text: choice?.message?.content || '', cutOff: choice?.finish_reason === 'length', refused: !!choice?.message?.refusal || choice?.finish_reason === 'content_filter', usage: { input: json?.usage?.prompt_tokens || 0, output: json?.usage?.completion_tokens || 0 } };

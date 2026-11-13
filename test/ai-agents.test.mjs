@@ -97,7 +97,7 @@ test('claude-code: print mode, no tools, safe mode, the review\'s own system pro
   assert.deepEqual(call.files, [], 'it runs in an empty folder');
   assert.deepEqual(aiFindings(r.pages[0]), [['ai-image-alt', '#bad']]);
   assert.deepEqual(r.ai.usage, { inputTokens: 700, outputTokens: 30 });
-  assert.match(r.ai.endpoint, /^the claude command \(Claude Code, the account it is logged in to\)$/);
+  assert.match(r.ai.endpoint, /^Claude Code, the claude command, with the account it is logged in to$/);
   assert.deepEqual(notesOf(r), []);
 });
 
@@ -204,6 +204,6 @@ test('CLI: a coding-agent CLI that is missing exits 2 before any browser starts;
   const ok = await cli([`${site.origin}/ai-image.html`, '--viewports', 'desktop', '--ai', 'claude-code', '--ai-no-cache', '--json', '-'], { ...envFor(), HOME: process.env.HOME });
   logged();
   assert.equal(ok.code, 0, ok.stderr);
-  assert.match(ok.stderr, /AI review: sending .* to claude-code \(the claude command \(Claude Code, the account it is logged in to\)\), with its default model\. About 1 request\./);
+  assert.match(ok.stderr, /AI review: sending .* to claude-code \(Claude Code, the claude command, with the account it is logged in to\), with its default model\. About 1 request\./);
   assert.deepEqual(JSON.parse(ok.stdout).pages[0].issues.filter((i) => i.source === 'ai').map((i) => i.id), ['ai-image-alt']);
 });

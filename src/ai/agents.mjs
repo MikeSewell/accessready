@@ -124,7 +124,8 @@ function envelope(stdout, bin) {
   throw new AiRequestError(`${bin} printed something that is not its JSON output: "${s.replace(/\s+/g, ' ').slice(0, 120)}"`, { repeatable: true });
 }
 
-const tokens = (u) => ({ input: u?.input_tokens || u?.prompt_tokens || 0, output: u?.output_tokens || u?.completion_tokens || 0 });
+// Anthropic counts tokens served from or written to its prompt cache apart from input_tokens.
+const tokens = (u) => ({ input: (u?.input_tokens || u?.prompt_tokens || 0) + (u?.cache_read_input_tokens || 0) + (u?.cache_creation_input_tokens || 0), output: u?.output_tokens || u?.completion_tokens || 0 });
 
 // The model's answer text from what the tool printed, in the shape send() returns.
 export function readAgentOutput(ai, stdout, dir) {
