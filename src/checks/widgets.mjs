@@ -462,6 +462,17 @@ async function hoverContent(_page, ctx) {
 // ---------------------------------------------------------------------------------------
 // 2.1.4: single character keys pressed with focus on the page itself.
 
+// A page that animates, scrolls or opens a popup by itself can change at the moment a key is
+// pressed. A key that seemed to do something counts only when tries with no key, before and
+// between, change nothing, and pressing it again does the same. Alternating them keeps
+// something on the page's own timer (a newsletter popup sliding in) from lining up with the
+// key presses. `trial(key)` presses `key` (or nothing, for null) and names what changed.
+export async function shortcutConfirmed(trial, key, effect) {
+  if (await trial(null)) return false;
+  if (await trial(key) !== effect) return false;
+  return !await trial(null);
+}
+
 async function pressLetters(_page, ctx) {
   if (!recall(ctx, 'widgets')?.keys) return [];
   return withFresh(ctx, async (page) => {
@@ -486,18 +497,14 @@ async function pressLetters(_page, ctx) {
         : w.dialogs.length ? `opens "${w.dialogs[0]}"`
         : focus ? `moves focus to ${focus}`
         : w.scrolled ? 'scrolls the page'
-        : quiet && w.mutations > 0 ? 'changes the page'
+        : quiet && w.mutations > 0 ? `changes the page (${w.changed || 'an element'})`
         : null;
     };
     const found = [];
     for (const key of SHORTCUT_KEYS) {
       const effect = await trial(key);
       if (!effect) continue;
-      // A page that animates or scrolls by itself can change at the moment a key is pressed.
-      // Count a key only when pressing it again does the same, and two tries with no key
-      // pressed do not.
-      if (await trial(key) !== effect) continue;
-      if (await trial(null) === effect || await trial(null) === effect) continue;
+      if (!await shortcutConfirmed(trial, key, effect)) continue;
       found.push(`"${key}" ${effect}`);
       if (found.length >= 3) break;
     }

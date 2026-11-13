@@ -124,12 +124,21 @@ export function startWatch() {
   if (w.observer) w.observer.disconnect();
   w.mutations = 0;
   w.outside = 0;
+  w.changed = '';
   w.scope = window.__accessready_scope || null;
   w.observer = new MutationObserver((list) => {
     for (const r of list) {
       if (r.type === 'attributes' && (String(r.attributeName).startsWith('data-accessready') || r.target === document.documentElement || r.target === document.body)) continue;
+      // Tags added to <head> (a script that loads on the first key press or scroll, a prefetch
+      // link) change nothing anyone sees.
+      if (document.head && (r.target === document.head || document.head.contains(r.target))) continue;
       w.mutations++;
       if (!w.scope || !w.scope.contains(r.target)) w.outside++;
+      // The first element that changed, so a report can say what moved.
+      if (!w.changed) {
+        const el = r.target.nodeType === 1 ? r.target : r.target.parentElement;
+        if (el) w.changed = el.tagName.toLowerCase() + (el.id ? `#${el.id}` : '') + (typeof el.className === 'string' && el.className.trim() ? `.${el.className.trim().split(/\s+/).slice(0, 2).join('.')}` : '') + (r.type === 'attributes' ? ` (${r.attributeName})` : '');
+      }
     }
   });
   w.observer.observe(document.documentElement, { subtree: true, childList: true, attributes: true, characterData: true });
@@ -151,6 +160,7 @@ export function readWatch() {
   return {
     mutations: w.mutations,
     outside: w.outside,
+    changed: w.changed,
     scrolled: Math.abs(scrollX - w.scroll[0]) + Math.abs(scrollY - w.scroll[1]) > 2,
     focusMoved: active !== w.active,
     focusInDialog: added.some((d) => d.contains(active)),

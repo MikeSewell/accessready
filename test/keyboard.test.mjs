@@ -7,7 +7,7 @@ import { audit } from '../src/index.mjs';
 import { startSite, tripwires, findings } from './helpers.mjs';
 
 const OWN = new Set(['focus-indicator-contrast', 'focus-appearance', 'focus-partly-obscured', 'focus-order', 'focus-changes-context', 'character-shortcut']);
-const PAGES = ['kb-clean', 'kb-focus-faint', 'kb-focus-thin', 'kb-partly-covered', 'kb-order-jump', 'kb-order-tabindex', 'kb-focus-navigates', 'kb-focus-beacon', 'kb-focus-window', 'kb-focus-dialog', 'kb-shortcut', 'kb-offscreen', 'popup', 'unreachable', 'focus'];
+const PAGES = ['kb-clean', 'kb-focus-faint', 'kb-focus-thin', 'kb-partly-covered', 'kb-order-jump', 'kb-order-tabindex', 'kb-focus-navigates', 'kb-focus-beacon', 'kb-focus-window', 'kb-focus-dialog', 'kb-shortcut', 'kb-head-script', 'kb-offscreen', 'popup', 'unreachable', 'focus'];
 // Pages whose findings differ by level, audited again at AA.
 const AA_PAGES = ['kb-clean', 'kb-focus-faint', 'kb-focus-thin', 'kb-partly-covered'];
 const wires = tripwires('/left.html');
@@ -102,6 +102,8 @@ test('a popup that is not caused by focus is not a 3.2.1 failure', () => {
 test('a single-letter shortcut on the document is flagged (2.1.4)', () => {
   assert.deepEqual(mine('kb-shortcut'), [['likely', 'character-shortcut', 'document']]);
   assert.match(at(aaa, PAGES, 'kb-shortcut').issues.find((i) => i.id === 'character-shortcut').message, /pressing "s" moves focus to input "Search"/);
+  // Tags a script adds to <head> on every key press change nothing anyone sees.
+  assert.deepEqual(mine('kb-head-script'), []);
 });
 
 test('keyboard failures count for 2.1.3 as well as 2.1.1', () => {
