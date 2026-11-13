@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Off-canvas menu</title>
+<style>
+  /* The menu waits off the right edge until it is opened. overflow-x: hidden on body puts
+     it out of reach, so nobody can scroll sideways to it. */
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; overflow-x: hidden; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  .drawer { position: absolute; top: 0; left: 100%; width: 280px; padding: 24px; background: #f4f4f4; }
+</style>
+</head>
+<body>
+<nav class="drawer" aria-label="Main"><ul><li><a href="clean.html">Home</a></li><li><a href="clean.html">About</a></li></ul></nav>
+<main>
+  <h1>Off-canvas menu</h1>
+  <p>The menu is parked past the right edge of the window, where it cannot be scrolled to.</p>
+</main>
+</body>
+</html>

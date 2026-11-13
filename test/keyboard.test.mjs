@@ -7,7 +7,7 @@ import { audit } from '../src/index.mjs';
 import { startSite, tripwires, findings } from './helpers.mjs';
 
 const OWN = new Set(['focus-indicator-contrast', 'focus-appearance', 'focus-partly-obscured', 'focus-order', 'focus-changes-context', 'character-shortcut']);
-const PAGES = ['kb-clean', 'kb-focus-faint', 'kb-focus-thin', 'kb-partly-covered', 'kb-order-jump', 'kb-order-tabindex', 'kb-focus-navigates', 'kb-focus-beacon', 'kb-focus-window', 'kb-focus-dialog', 'kb-shortcut', 'popup', 'unreachable', 'focus'];
+const PAGES = ['kb-clean', 'kb-focus-faint', 'kb-focus-thin', 'kb-partly-covered', 'kb-order-jump', 'kb-order-tabindex', 'kb-focus-navigates', 'kb-focus-beacon', 'kb-focus-window', 'kb-focus-dialog', 'kb-shortcut', 'kb-offscreen', 'popup', 'unreachable', 'focus'];
 // Pages whose findings differ by level, audited again at AA.
 const AA_PAGES = ['kb-clean', 'kb-focus-faint', 'kb-focus-thin', 'kb-partly-covered'];
 const wires = tripwires('/left.html');
@@ -53,6 +53,16 @@ test('focus partly under a fixed bar fails 2.4.12 at AAA and passes 2.4.11', () 
   const p = at(aaa, PAGES, 'kb-partly-covered');
   assert.match(p.issues.find((i) => i.id === 'focus-partly-obscured').message, /partly covered by #bar \(position: fixed\)/);
   assert.ok(!p.issues.some((i) => i.id === 'focus-not-obscured'), 'not entirely hidden, so 2.4.11 passes');
+});
+
+test('focus that lands off screen is a 2.4.7 problem, not 2.4.11', () => {
+  // 2.4.11 is about focus hidden behind content the author put over it. A link moved off
+  // screen with a transform cannot be seen at all, which is Focus Visible.
+  const p = at(aaa, PAGES, 'kb-offscreen');
+  const offscreen = p.issues.filter((i) => i.selector === '#hidden-link' && /^focus-/.test(i.id));
+  assert.deepEqual(offscreen.map((i) => [i.kind, i.id, i.wcag]), [['failure', 'focus-visible', ['2.4.7']]]);
+  assert.match(offscreen[0].message, /^a "Side menu link" takes keyboard focus while off screen/);
+  assert.ok(!p.issues.some((i) => i.id === 'focus-not-obscured'), 'nothing covers it, so 2.4.11 is not named');
 });
 
 test('a stop drawn far down the page between two neighbours is a likely order problem', () => {

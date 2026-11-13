@@ -18,14 +18,57 @@ export const issuer = (rules) => (id, fields = {}) => {
   };
 };
 
+// WebSockets. Playwright can route a socket but never unroute one, so each browser context
+// gets a single route the first time it is guarded, and that route asks which guards are on.
+// Sockets it routes still connect, so a chat widget opened later keeps working once the
+// guard is off; while a guard is on, what the page sends is recorded and dropped.
+const socketRoutes = new WeakMap();
+async function routeSockets(context) {
+  if (socketRoutes.has(context)) return socketRoutes.get(context);
+  const state = { guards: new Set() };
+  socketRoutes.set(context, state);
+  await context.routeWebSocket(/.*/, (ws) => {
+    const server = ws.connectToServer();
+    ws.onMessage((message) => {
+      if (!state.guards.size) return server.send(message);
+      for (const g of state.guards) g.sockets.push({ url: ws.url() });
+    });
+  });
+  return state;
+}
+
+// In the page: a socket opened before the guard (on page load, which is how chat and live
+// update widgets do it) is not routed, so its send() is replaced while the guard is on. What
+// it would have sent is counted, not kept: it can be the visitor's data. Routing a socket
+// makes Playwright swap window.WebSocket for a stand-in, and sockets opened before that are
+// still the browser's own, so the browser's own prototype is kept from the first call, which
+// runs before the route is added.
+function holdSockets(on) {
+  const h = (window.__accessready_sockets ||= { depth: 0, sent: [], send: null, proto: window.WebSocket?.prototype });
+  const P = h.proto;
+  if (!P) return [];
+  if (on) {
+    if (h.depth++ === 0) {
+      h.send = P.send;
+      Object.defineProperty(P, 'send', { configurable: true, writable: true, value: function send() { h.sent.push(String(this.url)); } });
+    }
+    return [];
+  }
+  if (h.depth > 0 && --h.depth === 0) Object.defineProperty(P, 'send', { configurable: true, writable: true, value: h.send });
+  return h.sent.splice(0);
+}
+
 // From now on nothing the page does can leave it or reach a server. A navigation of a top-level
 // page is answered with "204 No Content", which every browser treats as "stay where you are",
 // so the page and everything on it survive. With `writes`, any request that is not a read
-// (a POST from fetch, a beacon) is refused too. New windows are closed as soon as they open.
-// Every attempt is recorded, which is what the checks look at.
+// (a POST from fetch, a beacon) is refused too. Nothing is sent over a WebSocket, whether the
+// socket was open already or opens later. New windows are closed as soon as they open.
+// Every attempt is recorded, which is what the checks look at: page loads and requests in
+// `attempts`, socket messages in `sockets`.
 export async function guard(page, { writes = false } = {}) {
   const attempts = [];
   const popups = [];
+  const sockets = [];
   const context = page.context();
   const handler = async (route) => {
     const req = route.request();
@@ -45,12 +88,28 @@ export async function guard(page, { writes = false } = {}) {
   const onPage = (p) => { popups.push(p.url()); p.close().catch(() => {}); };
   await context.route('**/*', handler);
   context.on('page', onPage);
+  // Every frame there is now, before the route is added (see holdSockets). A frame added
+  // later opens its sockets after the route exists.
+  const frames = page.frames();
+  await Promise.all(frames.map((f) => f.evaluate(holdSockets, true).catch(() => {})));
+  const self = { sockets };
+  const routed = await routeSockets(context);
+  routed.guards.add(self);
+  let stopped = false;
   return {
     attempts,
     popups,
+    sockets,
     navigations: () => attempts.filter((a) => a.navigation),
     async stop() {
+      if (stopped) return;
+      stopped = true;
       context.off('page', onPage);
+      routed.guards.delete(self);
+      for (const f of frames) {
+        const held = await f.evaluate(holdSockets, false).catch(() => []);
+        for (const url of held) sockets.push({ url });
+      }
       await context.unroute('**/*', handler).catch(() => {});
     },
   };

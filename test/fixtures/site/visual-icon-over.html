@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Icons over a hero and a photo</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  button, input { font: inherit; padding: 8px 12px; }
+  img { max-width: 100%; height: auto; }
+  /* A transparent header fixed over a dark hero: the hero is not one of its ancestors. */
+  .top { position: fixed; top: 0; left: 0; right: 0; padding: 12px 24px; background: transparent; }
+  .hero { background: #111; color: #fff; padding: 96px 24px 48px; }
+  .bare { background: transparent; border: 0; padding: 8px; }
+  /* Carousel arrows drawn over the photo beside them. */
+  .carousel { position: relative; display: inline-block; }
+  .carousel img { display: block; width: 240px; height: 160px; object-fit: cover; }
+  .carousel .bare { position: absolute; top: 60px; }
+  .prev { left: 8px; }
+  .next { right: 8px; }
+  .icon { background: #fff; border: 0; padding: 8px; }
+</style>
+</head>
+<body>
+<header class="top">
+  <button type="button" id="hamburger" aria-label="Menu" class="bare"><svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z" fill="#fff"/></svg></button>
+</header>
+<section class="hero"><h1>Icons over a hero and a photo</h1></section>
+<main>
+  <div class="carousel">
+    <img src="dark.png" width="240" height="160" alt="Volunteers at night">
+    <button type="button" id="prev" aria-label="Previous" class="bare prev"><svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4l-8 8 8 8z" fill="#fff"/></svg></button>
+    <button type="button" id="next" aria-label="Next" class="bare next"><svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4l8 8-8 8z" fill="#fff"/></svg></button>
+  </div>
+  <!-- A faint icon on plain white is still measured and fails. -->
+  <p>Share this page <button type="button" id="share" aria-label="Share" class="icon"><svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l16-8-6 16-2-6z" fill="#c4c4c4"/></svg></button></p>
+</main>
+</body>
+</html>

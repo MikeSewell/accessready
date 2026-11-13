@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Focus off screen</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  .big { display: inline-block; min-width: 48px; min-height: 48px; padding: 10px 16px; box-sizing: border-box; }
+  :focus-visible { outline: 3px solid #0b4a8f; outline-offset: 2px; }
+  /* A closed side menu moved off screen with a transform; its link still takes focus. */
+  .drawer { position: fixed; top: 0; left: 0; width: 260px; transform: translateX(-200%); }
+</style>
+</head>
+<body>
+<nav class="drawer" aria-label="Side"><a id="hidden-link" class="big" href="clean.html">Side menu link</a></nav>
+<main>
+  <h1>Focus off screen</h1>
+  <p><a class="big" href="clean.html">An ordinary link</a></p>
+</main>
+</body>
+</html>
