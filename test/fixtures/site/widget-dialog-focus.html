@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dialog that drops focus</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  button, input, select { font: inherit; }
+  /* Targets of 48px and a solid 3px ring, so the page passes 2.5.5 and 2.4.13 unless it
+     plants something else on purpose. */
+  .big { display: inline-block; min-width: 48px; min-height: 48px; padding: 10px 16px; box-sizing: border-box; }
+  :focus-visible { outline: 3px solid #0b4a8f; outline-offset: 2px; }
+  #contact { position: fixed; top: 80px; left: 80px; width: 320px; padding: 24px; background: #fff; border: 2px solid #111; }
+  #contact[hidden] { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Dialog that drops focus</h1>
+  <p><button id="open" class="big" type="button" aria-haspopup="dialog">Contact us</button></p>
+  <p><a class="big" href="clean.html">A link after the button</a></p>
+</main>
+<div id="contact" role="dialog" aria-modal="true" aria-labelledby="contact-title" hidden>
+  <h2 id="contact-title">Contact us</h2>
+  <button id="close" class="big" type="button">Close</button>
+</div>
+<script>
+  // Takes focus and closes on Escape, but focus is left on nothing when it closes.
+  const open = document.getElementById('open'), dialog = document.getElementById('contact');
+  const close = () => { dialog.hidden = true; };
+  open.addEventListener('click', () => { dialog.hidden = false; document.getElementById('close').focus(); });
+  document.getElementById('close').addEventListener('click', close);
+  dialog.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+</script>
+</body>
+</html>

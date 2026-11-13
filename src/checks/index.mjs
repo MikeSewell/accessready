@@ -21,8 +21,10 @@ import * as interact from './interact.mjs';
 import * as layout from './layout.mjs';
 import * as contrast from './contrast.mjs';
 import * as site from '../site.mjs';
+import * as pointer from './pointer.mjs';
+import * as widgets from './widgets.mjs';
 
-export const MODULES = [keyboard, interact, layout, contrast, site];
+export const MODULES = [keyboard, interact, layout, contrast, site, pointer, widgets];
 
 export const RULES = Object.assign({}, ...MODULES.map((m) => m.rules || {}));
 export const PROBES = MODULES.flatMap((m) => m.probes || []);

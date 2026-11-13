@@ -34,3 +34,15 @@ export async function startSite(extra = {}, port = 0) {
 
 // The ids of one page's issues of a given kind, sorted, so a test can compare them exactly.
 export const ids = (page, kind = 'failure') => page.issues.filter((i) => i.kind === kind).map((i) => i.id).sort();
+
+// Paths that must never be reached by an audit: a test serves them, counts every request
+// (any method), and asserts the count stays at zero.
+export function tripwires(...paths) {
+  const hits = Object.fromEntries(paths.map((p) => [p, 0]));
+  const routes = Object.fromEntries(paths.map((p) => [p, () => { hits[p]++; return '<!doctype html><title>Should not be here</title>'; }]));
+  return { hits, routes };
+}
+
+// One page's findings from a given set of rules, as [kind, id, selector], so a test can
+// compare them exactly without depending on what other checks report about the same page.
+export const findings = (page, own) => page.issues.filter((i) => own.has(i.id)).map((i) => [i.kind, i.id, i.selector]).sort((a, b) => a.join().localeCompare(b.join()));

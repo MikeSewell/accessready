@@ -26,8 +26,11 @@
 </div>
 <script>
   // A popup that opens over the page without taking focus, so Tab carries on underneath it.
+  // Like popup.html it stands in for a timed popup: it opens on the visitor's second press of
+  // Tab, as focus moves to the second link, not because any element took focus.
   const popup = document.getElementById('popup');
-  document.getElementById('second').addEventListener('focus', () => { popup.hidden = false; });
+  let presses = 0;
+  document.addEventListener('keydown', (e) => { if (e.key === 'Tab' && ++presses === 2) popup.hidden = false; });
 </script>
 </body>
 </html>

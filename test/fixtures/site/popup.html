@@ -25,10 +25,14 @@
   <button id="popup-close" type="button">Close</button>
 </div>
 <script>
-  // Stands in for a timed newsletter popup: it opens once, takes focus and keeps it.
+  // Stands in for a timed newsletter popup: it opens once, takes focus and keeps it. It opens
+  // on the visitor's second press of Tab, as focus moves to the second link, so the walk meets
+  // it at the same place every run. It is not tied to any element taking focus, so it is not
+  // an on-focus change (3.2.1), and no letter key sets it off (2.1.4).
   const popup = document.getElementById('popup'), close = document.getElementById('popup-close');
-  document.getElementById('second').addEventListener('focus', () => {
-    if (popup.dataset.shown) return;
+  let presses = 0;
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Tab' || ++presses !== 2 || popup.dataset.shown) return;
     popup.dataset.shown = '1';
     setTimeout(() => { popup.hidden = false; close.focus(); }, 50);
   });

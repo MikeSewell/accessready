@@ -161,7 +161,9 @@ test('the inventory lists what a person has to look at', () => {
 });
 
 test('totals add up', () => {
-  assert.deepEqual(result.totals, { pages: 20, failures: 15, likely: 0, advice: 4, needsReview: result.totals.needsReview, errors: 0 });
+  // The one likely problem is focus.html's wrapper ring: a pale yellow tint (#ffe08a on white,
+  // about 1.3:1) that 2.4.7 accepts as visible and 1.4.11 flags as too faint.
+  assert.deepEqual(result.totals, { pages: 20, failures: 15, likely: 1, advice: 4, needsReview: result.totals.needsReview, errors: 0 });
   assert.equal(result.standard, 'WCAG 2.2 AA');
   assert.match(result.engine, /^axe-core \d+\.\d+\.\d+$/);
 });

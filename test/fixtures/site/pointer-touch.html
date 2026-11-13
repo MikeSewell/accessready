@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Touch-only control</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  button, input, select { font: inherit; }
+  /* Targets of 48px and a solid 3px ring, so the page passes 2.5.5 and 2.4.13 unless it
+     plants something else on purpose. */
+  .big { display: inline-block; min-width: 48px; min-height: 48px; padding: 10px 16px; box-sizing: border-box; }
+  :focus-visible { outline: 3px solid #0b4a8f; outline-offset: 2px; }
+
+</style>
+</head>
+<body>
+<main>
+  <h1>Touch-only control</h1>
+  <p><span id="like" class="big" role="button" tabindex="0">Like</span></p>
+  <p id="status"></p>
+</main>
+<script>
+  // Answers a finger and the keyboard, but not a mouse.
+  const like = document.getElementById('like'), status = document.getElementById('status');
+  like.addEventListener('touchend', () => { status.textContent = 'Liked'; });
+  like.addEventListener('keydown', (e) => { if (e.key === 'Enter') status.textContent = 'Liked'; });
+</script>
+</body>
+</html>

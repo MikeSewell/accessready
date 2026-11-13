@@ -41,9 +41,9 @@ As of axe-core 4.14, it has no rule for focus visibility, hidden focus, keyboard
 <!-- coverage:start -->
 | Of the 86 WCAG 2.2 A and AA criteria | |
 |---|---|
-| 31 | have at least one automated check that can fail a page |
+| 36 | have at least one automated check that can fail a page |
 | 16 | are not judged, but the HTML report lists exactly what a person has to look at |
-| 39 | need a person, with no help from the tool |
+| 25 | need a person, with no help from the tool |
 <!-- coverage:end -->
 
 Every criterion, what is tested and what is left to a person: [docs/COVERAGE.md](https://github.com/MikeSewell/accessready/blob/main/docs/COVERAGE.md). The table is generated from the code and checked on every commit.

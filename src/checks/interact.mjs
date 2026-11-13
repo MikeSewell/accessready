@@ -5,12 +5,15 @@
 const MAX_MENUS = 8;
 const MAX_DISCLOSURES = 8;
 const PAUSE = 250;
+// Something only a mouse can do fails 2.1.1, and 2.1.3 too: 2.1.3 is 2.1.1 without the
+// exception for path-dependent input, so every 2.1.1 failure here is also one of 2.1.3.
+const KEYBOARD = ['2.1.1', '2.1.3'];
 
 // 2.1.1 Keyboard. Two strengths of evidence:
 //   failure: the element says it is a control (role, onclick) and cannot take keyboard focus
 //   note:    the element only looks clickable (pointer cursor); a person should confirm
 export async function checkUnreachable(page) {
-  return page.evaluate(() => {
+  return page.evaluate((KEYBOARD) => {
     const out = [];
     const shown = (el) => { const r = el.getBoundingClientRect(); const cs = getComputedStyle(el); return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none' && +cs.opacity > 0; };
     const FOCUSABLE = 'a[href], button, input, select, textarea, summary, iframe, audio[controls], video[controls], [contenteditable=""], [contenteditable=true], [tabindex]:not([tabindex^="-"])';
@@ -33,7 +36,7 @@ export async function checkUnreachable(page) {
       return parts.join(' > ');
     };
     const issue = (el, kind, message) => ({
-      id: kind === 'failure' ? 'keyboard-unreachable' : 'looks-clickable', source: 'accessready', kind, wcag: ['2.1.1'],
+      id: kind === 'failure' ? 'keyboard-unreachable' : 'looks-clickable', source: 'accessready', kind, wcag: KEYBOARD,
       impact: kind === 'failure' ? 'critical' : 'moderate',
       title: kind === 'failure' ? 'Control cannot be reached with the keyboard' : 'Looks clickable but cannot be reached with the keyboard',
       message, selector: selector(el), html: el.outerHTML.replace(/\s+/g, ' ').slice(0, 160),
@@ -55,7 +58,7 @@ export async function checkUnreachable(page) {
       out.push(issue(el, 'advice', `${el.tagName.toLowerCase()} "${text(el)}" shows a pointer cursor but Tab never reaches it; if clicking it does something, keyboard users cannot do it`));
     }
     return out;
-  });
+  }, KEYBOARD);
 }
 
 // Marks submenus in navigation that are hidden until something reveals them, and returns
@@ -130,7 +133,7 @@ export async function checkHoverMenus(page) {
 
     const hiddenLinks = hovered.visible - before.visible;
     issues.push({
-      id: 'hover-only-menu', source: 'accessready', kind: 'failure', wcag: ['2.1.1'], impact: 'critical',
+      id: 'hover-only-menu', source: 'accessready', kind: 'failure', wcag: KEYBOARD, impact: 'critical',
       title: 'Menu opens on mouse hover only',
       message: `the menu under "${before.label}" opens when the mouse hovers over it but not from the keyboard, so ${hiddenLinks} link${hiddenLinks === 1 ? '' : 's'} cannot be reached without a mouse`,
       selector: `nav item "${before.label}"`, html: before.html,
@@ -195,7 +198,7 @@ export async function checkDisclosures(page) {
       await page.waitForTimeout(PAUSE);
       if ((await state())?.expanded) {
         issues.push({
-          id: 'keyboard-activation', source: 'accessready', kind: 'failure', wcag: ['2.1.1'], impact: 'critical',
+          id: 'keyboard-activation', source: 'accessready', kind: 'failure', wcag: KEYBOARD, impact: 'critical',
           title: 'Button works with the mouse but not the keyboard',
           message: `"${before.label}" opens when clicked but not when Enter or Space is pressed`,
           ...where,
@@ -231,22 +234,22 @@ export async function checkDisclosures(page) {
 
 export const rules = {
   'keyboard-unreachable': {
-    title: 'Control cannot be reached with the keyboard', criteria: ['2.1.1'], kinds: ['failure'],
+    title: 'Control cannot be reached with the keyboard', criteria: KEYBOARD, kinds: ['failure'],
     covers: 'Controls with a click handler or an interactive role that the Tab key never reaches.',
     why: 'People who cannot use a mouse reach every control with the Tab key. A control that Tab skips does not exist for them.',
   },
   'looks-clickable': {
-    title: 'Looks clickable but cannot be reached with the keyboard', criteria: ['2.1.1'], kinds: ['advice'],
+    title: 'Looks clickable but cannot be reached with the keyboard', criteria: KEYBOARD, kinds: ['advice'],
     covers: 'Elements with a pointer cursor that Tab never reaches are noted for a person to try.',
     why: 'If this does something when clicked, people who cannot use a mouse have no way to do it.',
   },
   'hover-only-menu': {
-    title: 'Menu opens on mouse hover only', criteria: ['2.1.1'], kinds: ['failure'],
+    title: 'Menu opens on mouse hover only', criteria: KEYBOARD, kinds: ['failure'],
     covers: 'Navigation menus are hovered, then the same is tried from the keyboard.',
     why: 'A menu that only opens when a mouse hovers over it hides every page inside it from keyboard and many touch-screen users.',
   },
   'keyboard-activation': {
-    title: 'Button works with the mouse but not the keyboard', criteria: ['2.1.1'], kinds: ['failure'],
+    title: 'Button works with the mouse but not the keyboard', criteria: KEYBOARD, kinds: ['failure'],
     covers: 'Buttons that open something are pressed with Enter and Space as well as clicked.',
     why: 'Keyboard users press Enter or Space where mouse users click. A control that ignores both is a dead end for them.',
   },

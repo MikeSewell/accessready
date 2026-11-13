@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tabs without arrow keys</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  button, input, select { font: inherit; }
+  /* Targets of 48px and a solid 3px ring, so the page passes 2.5.5 and 2.4.13 unless it
+     plants something else on purpose. */
+  .big { display: inline-block; min-width: 48px; min-height: 48px; padding: 10px 16px; box-sizing: border-box; }
+  :focus-visible { outline: 3px solid #0b4a8f; outline-offset: 2px; }
+  [role=tablist] { display: flex; gap: 8px; }
+  [role=tab] { min-height: 48px; padding: 10px 16px; }
+  [role=tabpanel] { padding: 16px; border: 1px solid #555; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Tabs without arrow keys</h1>
+  <div role="tablist" aria-label="Programs">
+    <button id="t1" role="tab" type="button" aria-selected="true" aria-controls="p1" tabindex="0">Youth</button>
+    <button id="t2" role="tab" type="button" aria-selected="false" aria-controls="p2" tabindex="-1">Seniors</button>
+  </div>
+  <div id="p1" role="tabpanel" aria-labelledby="t1"><p>Programs for young people.</p></div>
+  <div id="p2" role="tabpanel" aria-labelledby="t2" hidden><p>Programs for older people.</p></div>
+</main>
+<script>
+  const tabs = [...document.querySelectorAll('[role=tab]')];
+  const show = (tab, setSelected) => {
+    for (const t of tabs) {
+      document.getElementById(t.getAttribute('aria-controls')).hidden = t !== tab;
+      if (setSelected) { t.setAttribute('aria-selected', String(t === tab)); t.tabIndex = t === tab ? 0 : -1; }
+    }
+  };
+  // Correct on click, but the arrow keys do nothing and the second tab is out of the Tab order.
+  for (const t of tabs) t.addEventListener('click', () => show(t, true));
+</script>
+</body>
+</html>
