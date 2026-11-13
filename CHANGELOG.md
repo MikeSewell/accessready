@@ -19,6 +19,8 @@ Every WCAG 2.2 criterion, A to AAA, now has an automated check or is listed for 
 - Across the site: consistent identification (3.2.4), consistent help (3.2.6), and more than one way to find pages (2.4.5).
 - Documents: each linked PDF is downloaded once and checked for tags, a title, a language, real text and bookmarks.
 - Optional AI review (`--ai`) of wording and meaning: image descriptions, images of text, link text, headings, labels, titles, sensory instructions, unusual words and consistent names. Runs through Claude Code, Codex, Gemini CLI or Qwen Code with the account they are logged in to, or an API (Anthropic, OpenAI, Gemini, any OpenAI-compatible server, LM Studio, Ollama). Answers are cached and requests capped.
+- Gentle with your server: assets from the audited site are fetched once per audit and reused by every copy of every page, other requests are paced (`--rate`, default 8 a second), a 429 or 503 slows the audit right down, and a site that starts refusing connections is not asked again.
+- Per-check timings in the JSON output.
 - `accessready.config.json` (or `--config`): defaults for any option, and ignored findings, each with a required reason.
 - `--baseline` and `--update-baseline`: fail only on findings that are new since a saved baseline, and list what was fixed.
 - `--sarif`: SARIF 2.1.0 output for GitHub code scanning.

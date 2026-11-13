@@ -134,6 +134,7 @@ When you point it at localhost, URLs in the sitemap are rewritten onto localhost
 | `--max-tab-stops <n>` | 150 | Most Tab presses per page |
 | `--timeout <ms>` | 45000 | Page load timeout |
 | `--browser <list>` | auto | `auto` (installed Chrome, else Playwright's Chromium), `chrome`, `chromium`, `firefox`, `webkit`, or `all`; comma separated |
+| `--rate <n>` | 8 | Most requests a second to the audited site after a short burst; `0` for no limit |
 | `--proxy <url>` | | Send browser traffic through a proxy |
 | `--no-dismiss` | | Leave cookie banners alone instead of clicking Reject |
 | `--strict` | | Also fail on likely problems and best-practice notes |
@@ -316,6 +317,8 @@ process.exitCode = exitCode(result);
 accessready only does what a visitor could do. It clicks Reject on a cookie banner, presses Tab, hovers menus, and presses Enter on buttons marked `aria-expanded="false"`, closing each one again. It never presses Enter on a link. If a button navigates away anyway, it stops operating that page and says so.
 
 Some checks work on a fresh copy of the page, thrown away afterwards, so nothing they do touches the copy that is being walked: they move the page's clock forward 20 minutes, resize the window and zoom, turn a phone sideways, press single letter keys and arrow keys, hover tooltips and press Escape, press a mouse button without releasing it, simulate tilting a phone, press Play on a YouTube player to read its captions, change a dropdown, radio button or checkbox (never in a login or payment form, and with every request blocked), and cancel any alert or confirm box the page opens. At level AAA it also scrolls and hovers to look for motion.
+
+An audit opens each page several times: on each screen size, and in fresh copies for checks that change things. To keep that from looking like an attack to a server with a rate limit or fail2ban, stylesheets, scripts, images and fonts from your site are downloaded once per audit and reused, every other request to your site is paced (`--rate`, 8 a second by default), a "429 Too Many Requests" or "503" slows the audit to one request a second, and if your site stops accepting connections partway through, the remaining pages are not tried and the report says why. Requests to other hosts are not paced.
 
 To see how forms handle mistakes, it opens a separate copy of the page that cannot reach your server. While the copy loads, only GET and HEAD requests go out and service workers are off. Once the form test starts, every request, navigation and WebSocket message is stopped inside the browser and only recorded. In that copy it leaves required fields empty, types obvious nonsense such as `not-an-email` into typed fields, presses the submit button and reads what the page shows. It never types anything that looks like real data, tries at most three forms per page, and throws the copy away afterwards. If a form tries to send anyway, the report says so.
 
