@@ -2,7 +2,7 @@
 
 All notable changes to this project are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
-## 0.2.0 - unreleased
+## 0.2.0 - 2026-11-13
 
 Every WCAG 2.2 criterion, A to AAA, now has an automated check or is listed for a person, and every A and AA criterion has at least one automated check. Needs Node 22 or newer.
 
