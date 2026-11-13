@@ -21,8 +21,10 @@ import * as interact from './interact.mjs';
 import * as layout from './layout.mjs';
 import * as contrast from './contrast.mjs';
 import * as site from '../site.mjs';
+// The optional AI review. Its probe does nothing unless the run asked for it (opts.ai).
+import * as ai from '../ai/look.mjs';
 
-export const MODULES = [keyboard, interact, layout, contrast, site];
+export const MODULES = [keyboard, interact, layout, contrast, site, ai];
 
 export const RULES = Object.assign({}, ...MODULES.map((m) => m.rules || {}));
 export const PROBES = MODULES.flatMap((m) => m.probes || []);

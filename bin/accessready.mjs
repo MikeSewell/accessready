@@ -4,6 +4,8 @@ import { dirname, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { audit, exitCode, version, AccessReadyError, renderHtml, VIEWPORTS, BROWSERS } from '../src/index.mjs';
 import { renderPage, renderSummary } from '../src/report/console.mjs';
+import { resolveAi, PROVIDERS } from '../src/ai/providers.mjs';
+import { describePlan, renderAiConsole } from '../src/ai/review.mjs';
 
 const HELP = `accessready ${version}
 WCAG 2.2 audit for a whole site: every page, on a phone and a desktop screen.
@@ -37,6 +39,32 @@ Options
   --no-color             plain output
   -v, --version
   -h, --help
+
+AI review (optional; you choose the provider and pay it yourself)
+  --ai <provider:model>  also judge wording and meaning with a model: image descriptions,
+                         images of text, link text, headings, labels, page titles,
+                         instructions that rely on color or shape, and names that change
+                         between pages. Providers:
+                           anthropic:<model>          key in ANTHROPIC_API_KEY
+                           openai:<model>             key in OPENAI_API_KEY
+                           gemini:<model>             key in GEMINI_API_KEY
+                           lmstudio:<model>           LM Studio at http://localhost:1234/v1
+                           ollama:<model>             Ollama at http://localhost:11434/v1
+                           openai-compatible:<model>  any Chat Completions server, with
+                                                      --ai-base-url
+                         ACCESSREADY_AI_KEY is used for any provider when set. The model
+                         name is the one your provider lists, for example
+                         ollama:qwen2.5vl:7b.
+  --ai-base-url <url>    send AI requests here instead of the provider's usual address
+  --ai-max-requests <n>  most AI requests in one run (default 50; 0 uses only the cache)
+  --ai-no-cache          ask again instead of reusing answers kept in .accessready-cache/ai
+  --ai-no-images         send no images, only text (for text-only models)
+
+  The AI review sends each page's text, links, headings, form labels and images (scaled
+  down) to the provider you name. Do not use it on pages whose content must not leave
+  your machine, unless the model runs locally. Its findings are likely problems for a
+  person to confirm, marked as AI judgments; they never fail the run unless --strict is
+  set.
 
 Exit codes
   0  no failures
@@ -74,6 +102,11 @@ try {
       browser: { type: 'string', default: 'auto' },
       proxy: { type: 'string' },
       'no-dismiss': { type: 'boolean', default: false },
+      ai: { type: 'string' },
+      'ai-base-url': { type: 'string' },
+      'ai-max-requests': { type: 'string' },
+      'ai-no-cache': { type: 'boolean', default: false },
+      'ai-no-images': { type: 'boolean', default: false },
       strict: { type: 'boolean', default: false },
       'no-color': { type: 'boolean', default: false },
       version: { type: 'boolean', short: 'v', default: false },
@@ -98,6 +131,27 @@ for (const b of browsers) if (b !== 'auto' && !BROWSERS.includes(b)) fail(`--bro
 const level = flags.level.toUpperCase();
 if (!['A', 'AA', 'AAA'].includes(level)) fail(`--level must be A, AA or AAA, got "${flags.level}"`);
 if (flags['storage-state'] && !existsSync(flags['storage-state'])) fail(`--storage-state file not found: ${flags['storage-state']}`);
+
+// The AI review is checked here, before any browser starts, so a missing key or a typo in
+// the provider costs nothing.
+let ai = null;
+for (const f of ['ai-base-url', 'ai-max-requests', 'ai-no-cache', 'ai-no-images']) {
+  if (!flags.ai && (flags[f] !== undefined && flags[f] !== false)) fail(`--${f} needs --ai <provider:model>`);
+}
+if (flags.ai !== undefined) {
+  if (!flags.ai.includes(':')) fail(`--ai needs provider:model, for example anthropic:<model>; providers are ${Object.keys(PROVIDERS).join(', ')}`);
+  const max = flags['ai-max-requests'];
+  if (max !== undefined && !/^\d+$/.test(max)) fail(`--ai-max-requests needs a whole number, got "${max}"`);
+  ai = {
+    use: flags.ai,
+    baseUrl: flags['ai-base-url'],
+    maxRequests: max === undefined ? undefined : Number(max),
+    cache: !flags['ai-no-cache'],
+    images: !flags['ai-no-images'],
+  };
+  const { error } = resolveAi(ai);
+  if (error) fail(`--ai: ${error}`);
+}
 
 const jsonToStdout = flags.json === '-';
 const color = !flags['no-color'] && !process.env.NO_COLOR && !jsonToStdout && (process.stdout.isTTY || !!process.env.FORCE_COLOR);
@@ -125,9 +179,11 @@ try {
     browsers,
     proxy: flags.proxy || null,
     dismiss: !flags['no-dismiss'],
+    ai: ai && { ...ai, onPlan: (plan) => say(describePlan(plan) + '\n') },
     onPage: (page) => say(renderPage(page, { color }) + '\n'),
   });
 
+  if (result.ai) say(renderAiConsole(result, { color }) + '\n');
   say(renderSummary(result, { color }));
   if (flags.html) say(`\nReport: ${write(flags.html, renderHtml(result))}`);
   if (jsonToStdout) process.stdout.write(JSON.stringify(result, null, 2) + '\n');
