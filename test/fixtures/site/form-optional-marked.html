@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Optional fields marked, required ones not</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main, footer, header { padding: 24px; }
+  a { color: #0b4a8f; }
+  label { display: block; margin-top: 12px; }
+  input, button, textarea, select { font: inherit; padding: 8px 12px; margin: 4px 0; border: 1px solid #555; }
+  fieldset label { display: inline-block; margin-right: 16px; }
+  .error { color: #a00; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Ask a question</h1>
+  <p>We answer within two working days.</p>
+  <form action="/submit" method="post">
+    <label for="name">Full name</label>
+    <input id="name" name="name" type="text" autocomplete="name" required>
+    <label for="email">Email address</label>
+    <input id="email" name="email" type="email" autocomplete="email" required>
+    <label for="phone">Phone number (optional)</label>
+    <input id="phone" name="phone" type="tel" autocomplete="tel">
+    <button type="submit">Send question</button>
+  </form>
+</main>
+</body>
+</html>

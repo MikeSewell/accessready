@@ -7,8 +7,10 @@
 //            submit button and reads what the page shows.
 // Safety: the copy blocks every request that is not a plain GET or HEAD from the moment it
 // opens, every request of any kind once the form work starts, every navigation (answered
-// with 204 No Content, so the page stays put), every WebSocket, and service workers. The
-// form attempt never runs on the page the other checks use.
+// with 204 No Content, so the page stays put), every WebSocket, and service workers. Ways of
+// sending that request routing cannot see (shared workers, fetchLater, WebTransport, WebRTC,
+// and beacons sent as a page is hidden or closed) are taken out of the page before its own
+// scripts run. The form attempt never runs on the page the other checks use.
 import { inPage, loadIssue } from './inpage.mjs';
 
 const MAX_FORMS = 3; // forms tried per page
@@ -19,21 +21,81 @@ const SETTLE = 600; // ms to wait for a form to react to the submit button
 // submit button is pressed is not the form sending its data.
 const TELEMETRY = /(^|\.)(google-analytics\.com|analytics\.google\.com|googletagmanager\.com|doubleclick\.net|facebook\.com|facebook\.net|segment\.(io|com)|hotjar\.(com|io)|clarity\.ms|plausible\.io|sentry\.io|newrelic\.com|nr-data\.net|mixpanel\.com|amplitude\.com|heap(analytics)?\.(io|com)|fullstory\.com|bing\.com|linkedin\.com|tiktok\.com|stats\.wp\.com)$/;
 
+// Runs in every page and frame of the copy before the page's own scripts. Some ways of
+// sending never pass the request routing below, so the copy does without them:
+//   SharedWorker       its requests are not routed in Chromium; a submit handler that posted
+//                      through one reached the server. It is replaced by a stand-in whose
+//                      port records each message as an attempt to send, and goes nowhere.
+//   fetchLater         the browser sends it by itself as the page goes away. The stand-in
+//                      records it and never sends.
+//   WebTransport and RTCPeerConnection  HTTP/3 sessions and UDP are not routed either. They
+//                      are removed, as in a browser that does not have them.
+// And requests made while a page is hidden or unloaded (a beacon or keepalive fetch on
+// pagehide, unload or visibilitychange) reach the server in Chromium even while routing is in
+// force, so those events stop here, before any listener of the page's own. They only happen
+// when the page goes away or its tab is hidden, which the audit does not need to see.
+function withoutUnroutedSenders() {
+  const record = (what) => { try { window.__accessready_blocked?.(what); } catch { /* the copy is closing */ } };
+  try {
+    const Original = window.SharedWorker;
+    if (Original) {
+      const Stand = function SharedWorker(url) {
+        const channel = new MessageChannel();
+        channel.port2.onmessage = () => record({ type: 'sharedworker', url: String(url) });
+        channel.port2.start();
+        const worker = new EventTarget();
+        Object.defineProperty(worker, 'port', { value: channel.port1 });
+        worker.onerror = null;
+        return worker;
+      };
+      Stand.prototype = Original.prototype;
+      Object.defineProperty(window, 'SharedWorker', { value: Stand, configurable: true, writable: true });
+    }
+  } catch { /* leave it removed instead */ try { delete window.SharedWorker; } catch { /* nothing else to do */ } }
+  if (window.fetchLater) {
+    Object.defineProperty(window, 'fetchLater', {
+      value: (input) => { record({ type: 'fetchlater', url: String(input?.url || input) }); return { activated: false }; },
+      configurable: true, writable: true,
+    });
+  }
+  for (const name of ['WebTransport', 'RTCPeerConnection', 'webkitRTCPeerConnection']) {
+    try { delete window[name]; } catch { /* not there, or not removable */ }
+  }
+  const stop = (e) => { if (e.type !== 'visibilitychange' || document.visibilityState === 'hidden') e.stopImmediatePropagation(); };
+  for (const type of ['pagehide', 'unload', 'beforeunload', 'visibilitychange', 'freeze']) addEventListener(type, stop, true);
+}
+
 // Everything the copy sends once armed is recorded, then answered locally: navigations with
 // 204, anything else aborted. Before arming, only GET and HEAD go out, so the page can load.
+// `guard.pending` counts requests still being answered, so the copy is not closed under them.
 async function blockOutgoing(context, guard) {
-  await context.route('**/*', (route) => {
+  await context.exposeBinding('__accessready_blocked', (source, what) => {
+    if (guard.armed) guard.sent.push({ method: 'POST', url: what?.url || '', type: what?.type || 'other', navigation: false });
+  });
+  await context.addInitScript(withoutUnroutedSenders);
+  await context.route('**/*', async (route) => {
     const req = route.request();
     const method = req.method();
     if (!guard.armed && (method === 'GET' || method === 'HEAD')) return route.continue();
     guard.sent.push({ method, url: req.url(), type: req.resourceType(), navigation: req.isNavigationRequest() });
-    if (req.isNavigationRequest()) return route.fulfill({ status: 204, body: '' });
-    return route.abort('blockedbyclient');
+    guard.pending++;
+    try {
+      if (req.isNavigationRequest()) await route.fulfill({ status: 204, body: '' });
+      else await route.abort('blockedbyclient');
+    } finally { guard.pending--; }
   });
   // Not connecting to the server leaves the page with a socket that goes nowhere.
   await context.routeWebSocket(/.*/, (ws) => {
     ws.onMessage(() => { guard.sent.push({ method: 'WS', url: ws.url(), type: 'websocket', navigation: false }); });
   });
+}
+
+// Closes the copy once every request it made has been answered, so none is left waiting on
+// routing that is being taken down.
+async function closeCopy(context, guard) {
+  const pause = () => new Promise((done) => setTimeout(done, 50));
+  for (let waited = 0; guard.pending && waited < 2000; waited += 50) await pause();
+  await context.close().catch(() => {});
 }
 
 // Did this request carry the form's data somewhere? Images, styles and scripts the page
@@ -43,7 +105,7 @@ function isSend(r) {
   let host = '';
   try { host = new URL(r.url).hostname; } catch { /* data: and the like */ }
   if (TELEMETRY.test(host)) return false;
-  return r.navigation || (r.method !== 'GET' && r.method !== 'HEAD') || ['fetch', 'xhr', 'eventsource', 'ping', 'beacon'].includes(r.type);
+  return r.navigation || (r.method !== 'GET' && r.method !== 'HEAD') || ['fetch', 'xhr', 'eventsource', 'ping', 'beacon', 'sharedworker', 'fetchlater'].includes(r.type);
 }
 
 // ---------------------------------------------------------------------------------------
@@ -51,28 +113,64 @@ function isSend(r) {
 
 // Classifies the forms on the page, shared by the look and operate parts so they agree.
 function describeForms(h, { mark, maxForms, maxFields }) {
-  const FINANCIAL_BUTTON = /\b(pay|purchase|buy|place (your |my )?order|complete (your |my )?(order|purchase)|checkout|check out|donate|give now|transfer|confirm (payment|order|purchase)|subscribe and pay)\b/i;
-  const LEGAL_BUTTON = /\b(e-?sign|sign (the |this )?(agreement|contract|lease|form|application|petition)|i agree|accept (the )?(agreement|contract|offer)|submit (application|claim|return))\b/i;
-  const REVIEW_BUTTON = /\b(review|continue|next|preview|proceed|step \d)\b/i;
+  // Signing something is a commitment the button itself makes. A "Donate" or "Pay" button
+  // alone is not evidence of one: the amount is often checked on the next page or at the
+  // payment provider, which the copy never reaches.
+  const LEGAL_BUTTON = /\b(e-?sign|sign (the |this )?(agreement|contract|lease)|sign and submit|accept (the )?(agreement|contract|offer))\b/i;
+  const REVIEW_BUTTON = /\b(review|continue|next|preview|proceed|step \d|edit|change|back)\b/i;
+  // Text in the form promising a later step where the entry can be checked.
+  const REVIEW_TEXT = /\b(review|confirm|check)\b[^.]{0,50}\b(next|following) (page|step|screen)\b|\b(next|following) (page|step|screen)\b[^.]{0,50}\b(review|confirm|check)\b|\bbefore (you are|you're|we) (charged|charge)\b/i;
+  // The page saying, in so many words, that what is sent cannot be changed afterwards.
+  const FINAL_TEXT = /\b(cannot|can ?not|can't|won't be able to|will not be able to)\b[^.]{0,40}\b(change|changed|edit|edited|undo|undone|amend|amended|withdraw|withdrawn)\b|\b(all )?(sales|submissions|votes|ballots|entries|answers) are final\b/i;
   const CONFIRM_BOX = /\b(confirm|reviewed|correct|accurate|verified)\b/i;
   const SEND_BUTTON = /\b(send|submit|sign|log ?in|continue|next|save|pay|subscribe|join|register|apply|donate|order|book|reserve|request|create|search|go)\b/i;
+  // Telling a sign-up form from a login: both can have one password field.
+  const SIGNUP_TEXT = /\b(create (an |your |my |a |new )?(free )?account|sign ?up|register|registration|join (now|us|free|today)|get started|enrol?l|open (an |your )?account)\b/i;
+  const LOGIN_TEXT = /\b(log ?in|sign ?in|log ?on)\b/i;
+  const PERSONAL = /^(name|given-name|family-name|additional-name|honorific-prefix|tel|tel-national|bday|bday-day|bday-month|bday-year|street-address|address-line1|postal-code|sex|organization)$/;
+  const PERSONAL_LABEL = /^(your |full )?name$|\b(first|last|given|family|middle|sur) ?name\b|\bphone\b|\bmobile\b|\bbirth|\bdate of birth\b|\baddress\b|\bzip\b|\bpost(al)? ?code\b/i;
+  // The heading a form sits under: its own, or the nearest one before it.
+  const headingOf = (form) => {
+    const own = form.querySelector('legend, h1, h2, h3, h4');
+    if (own) return h.clean(own.textContent);
+    for (let n = form, d = 0; n && n !== document.body && d < 4; n = n.parentElement, d++) {
+      for (let s = n.previousElementSibling; s; s = s.previousElementSibling) {
+        const hd = s.matches('h1, h2, h3, h4') ? s : [...s.querySelectorAll('h1, h2, h3, h4')].pop();
+        if (hd) return h.clean(hd.textContent);
+      }
+    }
+    return '';
+  };
   const out = [];
-  let index = 0;
+  let index = 0, tried = 0;
   for (const form of document.querySelectorAll('form')) {
     const fields = h.fieldsOf(form);
     if (!fields.length) continue;
     const search = h.isSearch(form);
-    const passwords = fields.filter((f) => f.type === 'password');
-    const login = passwords.length === 1 && passwords[0].autocomplete !== 'new-password' &&
-      fields.filter((f) => /^(text|email|tel|password|)$/.test(f.type)).length <= 4;
-    const buttons = [...form.querySelectorAll('button, input[type=submit], input[type=image], [role=button]')]
+    const buttons = [...form.querySelectorAll('button, input[type=submit], input[type=image], [role=button], a[href]')]
       .concat(form.id ? [...document.querySelectorAll(`[form="${CSS.escape(form.id)}"]`)] : [])
       .filter(h.visible);
-    const submit = buttons.find((b) => b.matches('[type=submit], input[type=image], button:not([type])')) ||
-      buttons.find((b) => SEND_BUTTON.test(h.accName(b) || b.value || ''));
+    const pressable = buttons.filter((b) => b.tagName !== 'A');
+    const submit = pressable.find((b) => b.matches('[type=submit], input[type=image], button:not([type])')) ||
+      pressable.find((b) => SEND_BUTTON.test(h.accName(b) || b.value || ''));
     const submitText = submit ? h.clean(h.accName(submit) || submit.value) : '';
+    const heading = headingOf(form);
+    const passwords = fields.filter((f) => f.type === 'password');
+    const credential = fields.find((f) => f.type !== 'password' && /^(text|email|tel|)$/.test(f.type));
+    const personal = fields.filter((f) => f !== credential && f.type !== 'password' &&
+      (PERSONAL.test((f.getAttribute('autocomplete') || '').toLowerCase().trim().split(/\s+/).pop()) || PERSONAL_LABEL.test(h.fieldName(f).name)));
+    // A sign-up form: a password made up here, a second password to confirm it, a button or
+    // heading that says so, or other personal details asked for alongside the password.
+    const signup = passwords.some((f) => f.autocomplete === 'new-password') || passwords.length > 1 ||
+      SIGNUP_TEXT.test(submitText) || (SIGNUP_TEXT.test(heading) && !LOGIN_TEXT.test(submitText)) ||
+      (personal.length > 0 && !LOGIN_TEXT.test(submitText));
+    const login = passwords.length === 1 && !signup &&
+      fields.filter((f) => /^(text|email|tel|password|)$/.test(f.type)).length <= 4;
     const boxes = fields.filter((f) => f.type === 'checkbox').map((f) => h.fieldName(f).name);
     const cc = fields.some((f) => /^cc-|\bcc-/.test(f.autocomplete || '') || /card.?(number|no)|cc-?num|cvv|cvc|security code/i.test(`${f.name} ${f.id} ${h.fieldName(f).name}`));
+    const formText = h.clean(form.innerText);
+    const before = form.previousElementSibling ? h.clean(form.previousElementSibling.innerText) : '';
+    const finalSaid = (formText.match(FINAL_TEXT) || before.match(FINAL_TEXT) || [])[0] || '';
     const info = {
       index, name: h.clean(form.getAttribute('aria-label') || form.querySelector('legend, h1, h2, h3, h4')?.textContent || form.id || form.getAttribute('name') || ''),
       search, login, fields: fields.length, method: (form.getAttribute('method') || 'get').toLowerCase(),
@@ -81,12 +179,19 @@ function describeForms(h, { mark, maxForms, maxFields }) {
       submitDisabled: !!submit && (submit.disabled || submit.getAttribute('aria-disabled') === 'true'),
       // Only a real submit button makes the browser run its own validation.
       realSubmit: !!submit && submit.matches('[type=submit], input[type=image], button:not([type])'),
-      financial: cc || FINANCIAL_BUTTON.test(submitText) || LEGAL_BUTTON.test(submitText),
-      finalAction: !REVIEW_BUTTON.test(submitText),
+      // What the page itself shows about a commitment made by pressing the button: card
+      // details taken here, a signature, or words saying the entry is final.
+      commitment: cc ? 'card' : LEGAL_BUTTON.test(submitText) ? 'signature' : '',
+      finalSaid,
+      // Anything on this page that offers a later look at the entry.
+      reviewOffered: REVIEW_BUTTON.test(submitText) || REVIEW_TEXT.test(formText) ||
+        buttons.some((b) => b !== submit && REVIEW_BUTTON.test(h.accName(b) || b.value || '')),
       confirmBox: boxes.some((b) => CONFIRM_BOX.test(b)),
       selector: h.selector(form), html: h.snippet(form).slice(0, 120),
     };
-    if (mark && !search && index < maxForms) {
+    // Search forms are never tried, so they do not use up the limit.
+    if (mark && !search && tried < maxForms) {
+      tried++;
       form.setAttribute('data-accessready-form', String(index));
       if (submit) submit.setAttribute('data-accessready-submit', String(index));
       info.plan = [];
@@ -136,6 +241,7 @@ function readForms(h) {
     return h.clean([h.fieldName(f).name, ...labels.map(pseudo), describedText(f)].join(' '));
   };
   const MARKED = /\*|\brequired\b|\bmandatory\b|\(req\.?\)|\bobligatori[oa]\b|\bobligatoire\b|\berforderlich\b|\bpflichtfeld/i;
+  const OPTIONAL = /\(optional\)|\boptional\b|\bnot required\b/i;
   const ALL_REQUIRED = /\ball (fields|questions) (are )?(required|mandatory)\b|\bevery field is required\b/i;
   const STAR_EXPLAINED = /(\*|asterisk)[^.]{0,40}\b(required|mandatory)\b|\b(required|mandatory)[^.]{0,30}(\*|asterisk)/i;
   const GENERIC = /^(field|input|text|textbox|text box|text field|value|enter (text|value|here)|type here|untitled|label|form field|(field|input|question) ?\d+)$/i;
@@ -171,8 +277,12 @@ function readForms(h) {
     // in the code too, so screen readers say it.
     const req = fields.filter(required);
     const formSaysAll = ALL_REQUIRED.test(formText) || ALL_REQUIRED.test(before);
+    // The other convention (GOV.UK, Shopify checkout): optional fields say "(optional)" and
+    // every field without it is required. That marks the required ones too.
+    const optionalMarked = fields.some((f) => !required(f) && OPTIONAL.test(labelText(f)));
     const unmarked = req.filter((f) => !MARKED.test(labelText(f)));
-    if (unmarked.length && !formSaysAll) {
+    // Nobody expects to log in without a username and password, so a login form needs no marker.
+    if (unmarked.length && !formSaysAll && !optionalMarked && !info.login) {
       // Labels of required fields in a different color from the others, with no text marker.
       const colorOf = (f) => (f.labels?.[0] ? getComputedStyle(f.labels[0]).color : '');
       const optional = fields.filter((f) => !required(f) && f.labels?.[0]);
@@ -191,6 +301,9 @@ function readForms(h) {
 
     // 3.3.2: a format the field insists on, with no instruction about it.
     for (const f of fields) {
+      // A field nobody can type into (a read-only box a date picker fills, a disabled field)
+      // asks for no format.
+      if (f.readOnly || f.matches(':disabled')) continue;
       const { name } = h.fieldName(f);
       const hint = [name, f.getAttribute('placeholder'), f.getAttribute('title'), describedText(f), h.clean(wrapperOf(f, form).innerText)].join(' ');
       const datey = /^(text|)$/.test(f.type) && /\b(date|dob|birth ?(day|date)?)\b/i.test(`${name} ${f.name} ${f.id}`);
@@ -397,6 +510,23 @@ function snapshot(h, { i, props }) {
     pseudo[k] = pseudoText(f);
   }
   Object.defineProperty(window, '__accessready_snap', { value: { state, styles, pseudo, pseudoText }, configurable: true });
+  // The browser's own error bubble can be asked for by any script (reportValidity(), or
+  // requestSubmit() from a plain button), not only by a submit button. Each time it is, an
+  // "invalid" event fires at the fields. checkValidity() fires the same event and shows
+  // nothing, so its calls are left out, and so is an event the page cancels to show its own
+  // message instead.
+  if (!window.__accessready_invalid) {
+    const seen = [];
+    let checking = 0;
+    for (const C of [HTMLFormElement, HTMLInputElement, HTMLSelectElement, HTMLTextAreaElement, HTMLButtonElement, HTMLFieldSetElement, HTMLObjectElement, HTMLOutputElement]) {
+      const original = C.prototype.checkValidity;
+      if (!original) continue;
+      Object.defineProperty(C.prototype, 'checkValidity', { value: function checkValidity() { checking++; try { return original.call(this); } finally { checking--; } }, configurable: true, writable: true });
+    }
+    addEventListener('invalid', (e) => { if (!checking) seen.push(e); }, true);
+    Object.defineProperty(window, '__accessready_invalid', { value: seen, configurable: true });
+  }
+  window.__accessready_invalid.length = 0;
   document.activeElement?.blur?.();
 }
 
@@ -462,7 +592,8 @@ function judge(h, { i, props, colorProps, filled, realSubmit }) {
     : active && changed.some((c) => c.el.contains(active) || active.contains(c.el)) ? 'message' : 'other';
   return {
     gone: false,
-    nativeBlocked: realSubmit && !form.noValidate && !form.checkValidity(),
+    nativeBlocked: (realSubmit && !form.noValidate && !form.checkValidity()) ||
+      (window.__accessready_invalid || []).some((e) => !e.defaultPrevented && form.contains(e.target)),
     problems,
     texts: changed.map((c) => ({ text: c.text.slice(0, 200), live: c.live })),
     focus,
@@ -482,7 +613,7 @@ function isVague(message, name) {
 async function attemptForms(page, ctx) {
   if (!ctx.result.review?.forms?.length) return [];
   const issue = await loadIssue();
-  const guard = { armed: false, sent: [] };
+  const guard = { armed: false, sent: [], pending: 0 };
   let copy;
   try {
     copy = await ctx.fresh({ serviceWorkers: 'block', prepare: (context) => blockOutgoing(context, guard) });
@@ -492,15 +623,27 @@ async function attemptForms(page, ctx) {
   guard.armed = true;
   const dialogs = [];
   copy.on('dialog', (d) => { dialogs.push(d.message()); d.dismiss().catch(() => {}); });
-  copy.context().on('page', (p) => p.close().catch(() => {}));
+  const context = copy.context();
+  context.on('page', (p) => p.close().catch(() => {}));
+  try {
+    return await tryForms(copy, ctx, guard, dialogs, issue);
+  } finally {
+    await closeCopy(context, guard);
+  }
+}
 
+async function tryForms(copy, ctx, guard, dialogs, issue) {
   const issues = [], notes = [];
   const forms = await inPage(copy, describeForms, { mark: true, maxForms: MAX_FORMS, maxFields: MAX_FIELDS });
   const tryable = forms.filter((f) => !f.search);
   // The copy refuses anything but GET while it loads; a page that builds its forms from a
   // POST request (some GraphQL sites) may show fewer of them.
   if (forms.length < ctx.result.review.forms.length) notes.push(`the safe copy of the page showed ${forms.length} of its ${ctx.result.review.forms.length} forms; the others were not tried`);
-  if (tryable.length > MAX_FORMS) notes.push(`${tryable.length} forms on this page; the first ${MAX_FORMS} were tried with mistakes`);
+  if (tryable.length > MAX_FORMS) {
+    const searches = forms.length - tryable.length;
+    const besides = searches ? ` besides ${searches} search form${searches === 1 ? '' : 's'}` : '';
+    notes.push(`${tryable.length} forms on this page${besides}; the first ${MAX_FORMS} were tried with mistakes`);
+  }
 
   for (const form of tryable.filter((f) => f.plan)) {
     if (form.capped) notes.push(`the form "${form.name || form.selector}" has more than ${MAX_FIELDS} fields; the first ${MAX_FIELDS} were tried`);
@@ -547,10 +690,18 @@ async function attemptForms(page, ctx) {
       // It tried to send what it was given: empty required fields and nonsense. Anything the
       // server would have said about that was never seen.
       if (r.problems.length) notes.push(`the form "${form.name || form.selector}" tried to send with ${r.problems.length} field${r.problems.length === 1 ? '' : 's'} empty or invalid; accessready stopped the request, so errors that only the server reports were not seen`);
-      if (form.financial && form.finalAction && !form.confirmBox) {
-        issues.push(issue('error-prevention-financial', { ...where, message: `"${form.submitText}" sent the form straight away with ${r.problems.length ? 'empty or invalid fields' : 'every field left empty'}: no check, no review step and no confirmation box before a payment or commitment` }));
-      } else if (posts && form.finalAction && !form.confirmBox) {
-        issues.push(issue('error-prevention-all', { ...where, message: `"${form.submitText || 'Submit'}" sent the form straight away with ${r.problems.length ? 'empty or invalid fields' : 'every field left empty'}: nothing was checked, reviewed or confirmed first` }));
+      // 3.3.4 and 3.3.6. The copy answers the send itself, so a check on the server or a
+      // review on the next page is never seen. Only what this page shows counts: pressing the
+      // button commits (card details taken here, a signature, or words saying the entry is
+      // final), nothing here offers a review or a confirmation box, and the form went with
+      // empty or invalid fields.
+      const how = r.problems.length ? 'empty or invalid fields' : 'every field left empty';
+      const unseen = 'whether the server checks it or a review step follows was not seen';
+      if (!form.reviewOffered && !form.confirmBox && form.commitment) {
+        const what = form.commitment === 'card' ? 'on a page that takes card details' : 'and the button signs or accepts an agreement';
+        issues.push(issue('error-prevention-financial', { ...where, message: `"${form.submitText}" sent the form at once with ${how}, ${what}; nothing on this page offers a review step or a confirmation box, and ${unseen}` }));
+      } else if (!form.reviewOffered && !form.confirmBox && form.finalSaid && posts) {
+        issues.push(issue('error-prevention-all', { ...where, message: `"${form.submitText || 'Submit'}" sent the form at once with ${how}, and the page says "${form.finalSaid.slice(0, 60)}"; nothing on this page offers a review step or a confirmation box, and ${unseen}` }));
       }
       continue;
     }
@@ -584,7 +735,6 @@ async function attemptForms(page, ctx) {
       issues.push(issue('form-error-not-announced', { ...where, message: `error messages appeared after "${form.submitText || 'submit'}" ("${r.texts[0].text.slice(0, 60)}"), but focus stayed where it was and none of them is in a live region, so a screen reader says nothing` }));
     }
   }
-  await copy.context().close().catch(() => {});
   return { issues, notes };
 }
 
@@ -682,13 +832,13 @@ export const rules = {
     why: 'People with cognitive disabilities and people new to a process need to know what each field wants before they get it wrong.',
   },
   'error-prevention-financial': {
-    title: 'Payment or commitment is sent with no check or review', criteria: ['3.3.4', '3.3.6'], kinds: ['likely'],
-    covers: 'Forms that take payment or a legal commitment (card fields, "Pay", "Purchase", "Donate", "Sign") that send at once with empty or invalid fields and offer no review step or confirmation box.',
+    title: 'Payment or signature is sent in one step', criteria: ['3.3.4', '3.3.6'], kinds: ['likely'],
+    covers: 'Forms where pressing the button commits, as the page itself shows (card details taken on the page, or a button that signs or accepts an agreement), that send at once with empty or invalid fields while nothing on the page offers a review step or a confirmation box. The copy answers the send itself, so a person confirms whether the server checks the entry or a review follows.',
     why: 'A mistyped amount or a wrong click is costly. People with motor, reading or cognitive disabilities make these slips more often and need a chance to catch them.',
   },
   'error-prevention-all': {
-    title: 'Form is sent with no check or review', criteria: ['3.3.6'], kinds: ['likely'],
-    covers: 'Forms that post data and send at once with empty or invalid fields, with no review step or confirmation box.',
+    title: 'Final submission is sent in one step', criteria: ['3.3.6'], kinds: ['likely'],
+    covers: 'Forms that post data and say the entry cannot be changed afterwards (or that it is final), that send at once with empty or invalid fields while nothing on the page offers a review step or a confirmation box. A form that may be checked on the server, like most contact forms, is not flagged.',
     why: 'Without a check or a review step, a slip goes straight through, and the user may not be able to undo it.',
   },
   'redundant-entry': {

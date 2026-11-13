@@ -36,7 +36,24 @@ const AA = {
   // A message that takes a second to appear, and a form whose button stays disabled until
   // it is complete: neither is a silent form.
   'form-clean-slow': [],
+  // Each of these was a false alarm: a donation whose review happens at the payment
+  // provider, "(optional)" marking the other fields, a login with nothing marked, a plain
+  // button that asks for the browser's own messages, read-only and disabled fields, and a
+  // sign-up form taken for a login.
+  'form-donate': [],
+  'form-optional-marked': [],
+  'form-login-plain': [],
+  'form-report-validity': [],
+  'form-readonly-date': [],
+  'form-signup-captcha': [['likely', 'autocomplete-missing']],
+  // Two search forms do not use up the forms tried, so the contact form, fourth on the page,
+  // is reached and found silent.
+  'form-many': [['likely', 'form-error-silent']],
+  // Forms that send through ways request routing does not see. Nothing may arrive.
+  'form-shared-worker': [],
+  'form-leaks': [],
   // AAA problems only, so nothing at AA.
+  'form-final': [],
   'form-help': [],
   'form-sends': [],
   'form-clean': [],
@@ -47,7 +64,12 @@ const AAA = {
   'form-login-captcha': [['likely', 'auth-captcha'], ['likely', 'auth-captcha-enhanced']],
   // Already covers 3.3.6, so it is not reported a second time as a plain form.
   'form-payment': [['likely', 'error-prevention-financial']],
-  'form-sends': [['likely', 'error-prevention-all'], ['likely', 'error-prevention-all'], ['likely', 'error-prevention-all']],
+  // Plain forms checked on the server: what happens there is never seen, so 3.3.6 is not claimed.
+  'form-sends': [],
+  'form-donate': [],
+  // The page says the vote cannot be changed, and it went at once with nothing chosen.
+  'form-final': [['likely', 'error-prevention-all']],
+  'form-signup-captcha': [['likely', 'autocomplete-missing']],
   'form-clean': [],
 };
 
@@ -58,6 +80,8 @@ before(async () => {
   site = await startSite();
   aa = await audit(site.origin, { viewports: ['desktop'], paths: Object.keys(AA).map((p) => `/${p}.html`), concurrency: 3 });
   aaa = await audit(site.origin, { viewports: ['desktop'], paths: Object.keys(AAA).map((p) => `/${p}.html`), concurrency: 3, level: 'AAA' });
+  // A request a closing page lets slip out can land a moment after the audit returns.
+  await new Promise((done) => setTimeout(done, 1500));
 });
 after(() => site.close());
 
@@ -91,7 +115,9 @@ test('AAA form rules stay out of an AA audit', () => {
 test('messages name the field and what happened', () => {
   assert.match(at(aa, 'form-silent').issues[0].message, /^after "Send" with "Name \(required\)" left empty, the form did not send and nothing on screen changed$/);
   assert.match(at(aa, 'form-vague').issues[0].message, /says only "Invalid"/);
-  assert.match(at(aa, 'form-payment').issues[0].message, /^"Donate now" sent the form straight away/);
+  assert.equal(at(aa, 'form-payment').issues[0].message, '"Donate now" sent the form at once with every field left empty, on a page that takes card details; nothing on this page offers a review step or a confirmation box, and whether the server checks it or a review step follows was not seen');
+  assert.match(at(aaa, 'form-final').issues[0].message, /^"Cast my vote" sent the form at once with every field left empty, and the page says "cannot be changed"/);
+  assert.match(at(aa, 'form-signup-captcha').issues[0].message, /^"Full name", "Email" ask for the user's own details/);
   assert.match(at(aa, 'form-status').issues.find((i) => i.selector === '#count').message, /^"Showing 2 programs" appeared/);
 });
 
@@ -110,7 +136,29 @@ test('nothing the forms tried to send reached the server', () => {
   assert.deepEqual(notes, [
     '4 forms on this page; the first 3 were tried with mistakes',
     'the form "Message" tried to send with 1 field empty or invalid; accessready stopped the request, so errors that only the server reports were not seen',
+    // The script form sent by fetch and beacon, not by navigating; it was still caught.
+    'the form "Topic" tried to send with 1 field empty or invalid; accessready stopped the request, so errors that only the server reports were not seen',
   ]);
-  // The script form sent by fetch and beacon, not by navigating; it was still caught.
-  assert.ok(at(aaa, 'form-sends').issues.some((i) => i.selector === '#by-script'));
+});
+
+test('a form that posts through a shared worker is seen sending, and nothing arrives', () => {
+  // The page posts through its own shared worker, one started from an empty iframe and one
+  // from a new window. None of the requests may reach the server, and the attempt counts as
+  // a send, so the form is not called silent.
+  assert.deepEqual(site.hits, []);
+  assert.deepEqual(at(aa, 'form-shared-worker').notes, [
+    'the form "f" tried to send with 1 field empty or invalid; accessready stopped the request, so errors that only the server reports were not seen',
+  ]);
+});
+
+test('workers, iframes, new windows, sockets, fetchLater and goodbye beacons send nothing', () => {
+  // form-leaks sends through each of these when the button is pressed, and again as the page
+  // is hidden or closed. The paths all start with /submit, so the server counts every one.
+  assert.deepEqual(site.hits, []);
+  assert.ok(at(aa, 'form-leaks').notes.some((n) => /^the form "f" tried to send/.test(n)));
+});
+
+test('search forms do not use up the forms tried, and the note counts them apart', () => {
+  assert.deepEqual(at(aa, 'form-many').notes, ['4 forms on this page besides 2 search forms; the first 3 were tried with mistakes']);
+  assert.equal(at(aa, 'form-many').issues.find((i) => i.id === 'form-error-silent').selector, '#name');
 });
