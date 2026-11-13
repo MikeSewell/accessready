@@ -16,7 +16,10 @@ before(async () => {
 after(() => site.close());
 
 test('a clean page reports nothing', () => {
-  assert.deepEqual(page('clean').issues, []);
+  // The demo pages, taken together as a site, offer only a menu to find pages by. That
+  // site-level finding (2.4.5) lands on the first page audited; the page itself is clean.
+  assert.deepEqual(page('clean').issues.filter((i) => i.scope !== 'site'), []);
+  assert.deepEqual(page('clean').issues.map((i) => [i.kind, i.id]), [['likely', 'multiple-ways']]);
   assert.equal(page('clean').tabStops, 3);
   assert.equal(page('clean').error, null);
 });
@@ -161,7 +164,7 @@ test('the inventory lists what a person has to look at', () => {
 });
 
 test('totals add up', () => {
-  assert.deepEqual(result.totals, { pages: 20, failures: 15, likely: 0, advice: 4, needsReview: result.totals.needsReview, errors: 0 });
+  assert.deepEqual(result.totals, { pages: 20, failures: 15, likely: 1, advice: 4, needsReview: result.totals.needsReview, errors: 0 });
   assert.equal(result.standard, 'WCAG 2.2 AA');
   assert.match(result.engine, /^axe-core \d+\.\d+\.\d+$/);
 });
@@ -170,10 +173,11 @@ test('pages are compared with each other: navigation order and shared titles', a
   const r = await audit(site.origin, { viewports: ['desktop'], paths: ['/nav-a.html', '/nav-b.html', '/nav-c.html', '/nav-d.html'] });
   const found = r.pages.map((p) => p.issues.map((i) => `${i.kind}:${i.id}`));
   // a and b share a title; c lists Donate before Programs; d only drops a link, which is fine.
-  assert.deepEqual(found, [['advice:duplicate-title'], ['advice:duplicate-title'], ['failure:inconsistent-navigation'], []]);
+  // The menu is the only way to find pages, which is flagged once, on the first page (2.4.5).
+  assert.deepEqual(found, [['advice:duplicate-title', 'likely:multiple-ways'], ['advice:duplicate-title'], ['failure:inconsistent-navigation'], []]);
   assert.match(r.pages[2].issues[0].message, /"Programs" in a different place .* \(usual order: Home, Programs, Donate, Contact\)$/);
   assert.ok(r.pages.every((p) => p.issues.every((i) => i.scope === 'site')));
-  assert.deepEqual(r.totals, { pages: 4, failures: 1, likely: 0, advice: 2, needsReview: 0, errors: 0 });
+  assert.deepEqual(r.totals, { pages: 4, failures: 1, likely: 1, advice: 2, needsReview: 0, errors: 0 });
 });
 
 test('with dismissal off, the banner is reported as covering the page', async () => {

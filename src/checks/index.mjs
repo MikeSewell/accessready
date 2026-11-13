@@ -14,6 +14,9 @@
 //           `browsers` limits a probe to some engines (chromium, firefox, webkit).
 //           run() returns an array of issues, or { issues, notes }.
 //   siteProbes [{ name, run(pages, ctx) }]  run once after every page, to compare pages.
+//           ctx: { level, opts, browser, origin, siteUrls, cache }. `siteUrls` is every page
+//           the audit knows of (the whole sitemap, even past --max). `cache` lives for the
+//           whole audit, so work done for one screen size is not repeated for the next.
 // Modules built into src/index.mjs (axe, keyboard walk, layout, interact, contrast, site)
 // export only rules; their order is fixed there.
 import * as keyboard from './keyboard.mjs';
@@ -21,8 +24,10 @@ import * as interact from './interact.mjs';
 import * as layout from './layout.mjs';
 import * as contrast from './contrast.mjs';
 import * as site from '../site.mjs';
+import * as sitewide from './sitewide.mjs';
+import * as documents from './documents.mjs';
 
-export const MODULES = [keyboard, interact, layout, contrast, site];
+export const MODULES = [keyboard, interact, layout, contrast, site, sitewide, documents];
 
 export const RULES = Object.assign({}, ...MODULES.map((m) => m.rules || {}));
 export const PROBES = MODULES.flatMap((m) => m.probes || []);

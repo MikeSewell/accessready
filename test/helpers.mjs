@@ -4,7 +4,7 @@ import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const SITE = fileURLToPath(new URL('./fixtures/site/', import.meta.url));
-const TYPES = { '.html': 'text/html; charset=utf-8', '.xml': 'application/xml', '.webm': 'video/webm', '.png': 'image/png' };
+const TYPES = { '.html': 'text/html; charset=utf-8', '.xml': 'application/xml', '.webm': 'video/webm', '.png': 'image/png', '.pdf': 'application/pdf' };
 
 // Serves test/fixtures/site, on a free port unless one is given. `extra` maps a path to a function returning HTML,
 // for pages a test builds itself.
