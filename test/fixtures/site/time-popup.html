@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Timed popup</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  button { font: inherit; padding: 8px 12px; }
+  #popup { position: fixed; inset: 20%; background: #fff; border: 2px solid #111; padding: 24px; }
+  #popup[hidden] { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Timed popup</h1>
+  <p>A newsletter popup opens after a minute.</p>
+  <div id="popup" role="dialog" aria-modal="true" aria-labelledby="popup-title" hidden>
+    <h2 id="popup-title">Join our newsletter</h2>
+    <button type="button" id="close">Close</button>
+  </div>
+</main>
+<script>
+  const popup = document.getElementById("popup");
+  setTimeout(() => { popup.hidden = false; }, 60 * 1000);
+  document.getElementById("close").addEventListener("click", () => { popup.hidden = true; });
+</script>
+</body>
+</html>

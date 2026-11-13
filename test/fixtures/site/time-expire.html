@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session expires</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  button { font: inherit; padding: 8px 12px; }
+
+</style>
+</head>
+<body>
+<main>
+  <h1>Your account</h1>
+  <form action="clean.html"><label for="note">Note</label> <input id="note" type="text"></form>
+</main>
+<script>
+  // After fifteen minutes the session ends with no warning.
+  setTimeout(() => { document.querySelector("main").innerHTML = "<h1>Your session has expired</h1><p><a href=\"clean.html\">Sign in again</a></p>"; }, 15 * 60 * 1000);
+</script>
+</body>
+</html>

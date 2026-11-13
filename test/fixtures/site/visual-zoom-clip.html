@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Box cut off at 200%</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  button, input { font: inherit; padding: 8px 12px; }
+  img { max-width: 100%; height: auto; }
+  /* One line at 100%; at 200% zoom the box is half as wide, the text wraps, and the fixed height cuts it off. */
+  .hours { width: 40%; height: 1.5em; overflow: hidden; font-size: 28px; background: #e3ecf7; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Box cut off at 200%</h1>
+  <div id="hours" class="hours">Open every day nine to five</div>
+</main>
+
+</body>
+</html>

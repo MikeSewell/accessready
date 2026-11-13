@@ -66,7 +66,10 @@ async function open(page, url, timeout) {
   return res;
 }
 
-async function newContext(browser, viewport, opts, extra = {}) {
+// Pages are audited with reduced motion asked for, so animations hold still for screenshots.
+// A check about motion itself can ask for 'no-preference', which is what most visitors have.
+// `extra` holds further context options (serviceWorkers).
+async function newContext(browser, viewport, opts, { reducedMotion = 'reduce', ...extra } = {}) {
   const { name, isMobile, hasTouch, ...size } = viewport;
   const context = await browser.newContext({
     ...extra,
@@ -74,7 +77,7 @@ async function newContext(browser, viewport, opts, extra = {}) {
     // Firefox has no mobile emulation; it still renders at phone width.
     ...(isMobile && engineOf(browser) !== 'firefox' ? { isMobile: true } : {}),
     ...(hasTouch ? { hasTouch: true } : {}),
-    reducedMotion: 'reduce',
+    reducedMotion,
     ...(opts.storageState ? { storageState: opts.storageState } : {}),
   });
   await context.addInitScript(instrument);
@@ -140,8 +143,9 @@ async function auditPage(browser, url, viewport, opts) {
     // `prepare(context)` runs before the copy loads, so a check can install request routing
     // first. `serviceWorkers: 'block'` keeps service workers out of the copy: requests they
     // make would bypass that routing.
-    const fresh = async ({ clock = false, prepare = null, serviceWorkers = 'allow' } = {}) => {
-      const ctx = await newContext(browser, viewport, opts, { serviceWorkers });
+    // `reducedMotion: 'no-preference'` loads it the way a visitor without that setting sees it.
+    const fresh = async ({ clock = false, prepare = null, serviceWorkers = 'allow', reducedMotion } = {}) => {
+      const ctx = await newContext(browser, viewport, opts, { serviceWorkers, reducedMotion });
       extraContexts.push(ctx);
       if (prepare) await prepare(ctx);
       const p = await ctx.newPage();
@@ -155,7 +159,7 @@ async function auditPage(browser, url, viewport, opts) {
       for (const probe of probes(phase)) {
         if (probe.isolated || probe.clock) {
           let p;
-          try { p = await fresh({ clock: !!probe.clock }); } catch (e) {
+          try { p = await fresh({ clock: !!probe.clock, reducedMotion: probe.reducedMotion }); } catch (e) {
             result.notes.push(`the ${probe.name} check could not open the page again: ${String(e.message).split('\n')[0]}`);
             continue;
           }
@@ -173,7 +177,7 @@ async function auditPage(browser, url, viewport, opts) {
     result.review = await takeInventory(page);
     await runPhase('look');
 
-    const contrast = await measureContrastOnImages(page, axe.unmeasuredContrast);
+    const contrast = await measureContrastOnImages(page, axe.unmeasuredContrast, { level: opts.level });
     // What is left for a person after measuring: axe's other undecided rules, plus the text
     // whose background passes in some places and fails in others.
     result.needsReview = axe.needsReview

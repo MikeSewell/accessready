@@ -10,7 +10,9 @@
 //             measure  takes screenshots, may restyle the page and puts it back
 //             operate  presses keys, clicks, hovers, resizes. With `isolated: true` it gets a
 //                      fresh copy of the page, so whatever it does cannot affect other checks.
-//                      With `clock: true` that copy runs on a controllable clock.
+//                      With `clock: true` that copy runs on a controllable clock, and with
+//                      `reducedMotion: 'no-preference'` it is loaded the way a visitor who
+//                      has not asked for reduced motion sees it (audits ask for 'reduce').
 //           `browsers` limits a probe to some engines (chromium, firefox, webkit).
 //           run() returns an array of issues, or { issues, notes }.
 //   siteProbes [{ name, run(pages, ctx) }]  run once after every page, to compare pages.
@@ -31,11 +33,14 @@ import * as widgets from './widgets.mjs';
 import * as forms from './forms.mjs';
 import * as content from './content.mjs';
 import * as language from './language.mjs';
+import * as media from './media.mjs';
+import * as time from './time.mjs';
+import * as visual from './visual.mjs';
 
 // The optional AI review. Its probe does nothing unless the run asked for it (opts.ai).
 import * as ai from '../ai/look.mjs';
 
-export const MODULES = [keyboard, interact, layout, contrast, site, sitewide, documents, pointer, widgets, forms, content, language, ai];
+export const MODULES = [keyboard, interact, layout, contrast, site, sitewide, documents, pointer, widgets, forms, content, language, media, time, visual, ai];
 
 export const RULES = Object.assign({}, ...MODULES.map((m) => m.rules || {}));
 export const PROBES = MODULES.flatMap((m) => m.probes || []);

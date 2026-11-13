@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Visual done right</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  button, input { font: inherit; padding: 8px 12px; }
+  img { max-width: 100%; height: auto; }
+  .title { font-size: 2rem; }
+  .prose { max-width: 30em; }
+  .prose p { line-height: 1.6; margin: 0 0 1.2em; }
+  .strong { border: 1px solid #767676; }
+  .icon { background: #fff; border: 0; padding: 8px; color: #333; }
+</style>
+</head>
+<body>
+<main>
+  <header><a href="/"><img class="logo" src="text-banner.png" width="240" height="80" alt="Spring food drive home"></a></header>
+  <h1 class="title">Visual done right</h1>
+  <div class="prose">
+    <p>Our food pantry opens three days a week and is run by volunteers from the neighborhood, who sort donations and pack boxes.</p>
+    <p>The summer meal program feeds children while school is out, at four sites close to where families live.</p>
+  </div>
+  <form action="clean.html">
+    <label for="email">Email</label> <input id="email" type="email" autocomplete="email" class="strong">
+    <label for="name">Name</label> <input id="name" type="text" autocomplete="name">
+    <button type="submit">Sign up</button>
+  </form>
+  <p>Share this page <button type="button" aria-label="Share" class="icon"><svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l16-8-6 16-2-6z" fill="#444"/></svg></button>
+  <button type="button" aria-label="Close" class="icon glyph">&#10005;</button></p>
+  <p><img src="photo.png" width="240" height="160" alt="Volunteers at work"></p>
+</main>
+
+</body>
+</html>
