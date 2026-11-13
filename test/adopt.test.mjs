@@ -159,7 +159,9 @@ test('SARIF output has the shape SARIF 2.1.0 and code scanning require', async (
   const run0 = log.runs[0];
   const results = run0.results.map((x) => [x.ruleId, x.level, new URL(x.locations[0].physicalLocation.artifactLocation.uri).pathname]);
   assert.deepEqual(results, [
-    ['focus-visible', 'error', '/focus.html'], ['focus-caret-only', 'note', '/focus.html'],
+    ['focus-visible', 'error', '/focus.html'],
+    // The pale yellow wrapper ring on focus.html is under 3:1 (1.4.11): a likely problem.
+    ['focus-indicator-contrast', 'warning', '/focus.html'], ['focus-caret-only', 'note', '/focus.html'],
     // Three unrelated demo pages with no menu or search between them: a likely problem.
     ['multiple-ways', 'warning', '/focus.html'],
     ['color-contrast', 'error', '/rules.html'], ['target-size', 'error', '/rules.html'], ['target-size', 'error', '/rules.html'],

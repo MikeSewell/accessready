@@ -161,7 +161,8 @@ test('the run reports what the AI review cost', () => {
     provider: 'anthropic', model: 'test-model', endpoint: `${fake.url}/v1/messages`, pages: 7,
     requests: 8, cached: 0, notReviewed: 0, usage: { inputTokens: 8000, outputTokens: 400 },
   });
-  assert.equal(first.totals.likely, 4);
+  // Only the AI's own findings: the machine checks also flag likely problems on these pages.
+  assert.equal(first.pages.flatMap((p) => p.issues).filter((i) => i.source === 'ai' && i.kind === 'likely').length, 4);
   assert.equal(JSON.stringify(first).includes('"data"'), false, 'no image data in the results');
 });
 

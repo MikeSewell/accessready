@@ -7,9 +7,13 @@ import { audit } from '../src/index.mjs';
 import { startSite, ids } from './helpers.mjs';
 
 const engines = (process.env.ACCESSREADY_BROWSERS || '').split(',').map((s) => s.trim()).filter(Boolean);
+// The demo site starts only when there is something to run: a server left open with no
+// test to close it would keep the test runner waiting forever.
 let site;
-before(async () => { site = await startSite(); });
-after(() => site?.close());
+if (engines.length) {
+  before(async () => { site = await startSite(); });
+  after(() => site.close());
+}
 
 for (const engine of engines) {
   test(`${engine}: a clean page stays clean and planted problems are found`, async () => {
