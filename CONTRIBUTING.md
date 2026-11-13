@@ -1,10 +1,10 @@
-# Contributing to focuswalk
+# Contributing to accessready
 
 Issues and pull requests are welcome.
 
 ## The most useful report: a false positive
 
-focuswalk is only worth running if people trust what it says. If it reports something a person looking at the page would not call a problem, or misses something obvious, open an issue with:
+accessready is only worth running if people trust what it says. If it reports something a person looking at the page would not call a problem, or misses something obvious, open an issue with:
 
 - The URL, or a small HTML file that reproduces it
 - The command you ran and what it printed
@@ -20,15 +20,15 @@ For anything beyond a small fix, open an issue first so we can agree on the appr
 
 - One pull request, one concern. Don't reformat unrelated code.
 - A change to a check needs a demo page. Every check has a page under `test/fixtures/site` that plants the problem, and a test in `test/checks.test.mjs` that pins down exactly what is reported for it. Add or extend one.
-- Don't hand-write a rule that axe-core already has. Rule-based checks belong upstream in [axe-core](https://github.com/dequelabs/axe-core); focuswalk's own checks are the ones that need a real keyboard or a real viewport.
+- Don't hand-write a rule that axe-core already has. Rule-based checks belong upstream in [axe-core](https://github.com/dequelabs/axe-core); accessready's own checks are the ones that need a real keyboard or a real viewport.
 - New dependencies need a reason. There are three today: `playwright`, `@axe-core/playwright` and `pngjs`.
 - Be precise about WCAG. A check that reports a failure has to map to a level A or AA success criterion. Good practice that WCAG doesn't require is a note (`kind: 'advice'`).
 
 ## Running locally
 
 ```sh
-git clone https://github.com/MikeSewell/focuswalk.git
-cd focuswalk
+git clone https://github.com/MikeSewell/accessready.git
+cd accessready
 npm install
 npm test
 ```
@@ -39,7 +39,7 @@ To try a change by hand:
 
 ```sh
 node test/serve.mjs &
-node bin/focuswalk.mjs http://127.0.0.1:4173 /focus.html
+node bin/accessready.mjs http://127.0.0.1:4173 /focus.html
 ```
 
 ## Code style

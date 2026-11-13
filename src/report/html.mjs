@@ -260,7 +260,7 @@ export function renderHtml(result) {
     <li>Whether status messages (&ldquo;added to cart&rdquo;, &ldquo;3 results&rdquo;) are announced.</li>
     <li>Whether anything flashes, times out, or changes just because it received focus.</li>
   </ul>
-  <p><a href="https://github.com/MikeSewell/focuswalk/blob/main/docs/COVERAGE.md">See the full list, requirement by requirement</a>.</p>
+  <p><a href="https://github.com/MikeSewell/accessready/blob/main/docs/COVERAGE.md">See the full list, requirement by requirement</a>.</p>
 
   <h2>Pages checked</h2>
   <table>
@@ -270,7 +270,7 @@ export function renderHtml(result) {
   </table>
 </main>
 <footer>
-  <p>Made with <a href="https://github.com/MikeSewell/focuswalk">focuswalk</a> ${esc(result.version)}${result.engine ? ` and ${esc(result.engine)}` : ''}. focuswalk is free and open source, built by Mike Sewell at <a href="https://automateimpact.org">Automate Impact</a>.</p>
+  <p>Made with <a href="https://github.com/MikeSewell/accessready">accessready</a> ${esc(result.version)}${result.engine ? ` and ${esc(result.engine)}` : ''}. accessready is free and open source, built by <a href="https://msewell.com">Michael Sewell</a>.</p>
 </footer>
 </body>
 </html>

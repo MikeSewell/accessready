@@ -33,7 +33,7 @@ export async function checkUnreachable(page) {
       return parts.join(' > ');
     };
     const issue = (el, kind, message) => ({
-      id: kind === 'failure' ? 'keyboard-unreachable' : 'looks-clickable', source: 'focuswalk', kind, wcag: ['2.1.1'],
+      id: kind === 'failure' ? 'keyboard-unreachable' : 'looks-clickable', source: 'accessready', kind, wcag: ['2.1.1'],
       impact: kind === 'failure' ? 'critical' : 'moderate',
       title: kind === 'failure' ? 'Control cannot be reached with the keyboard' : 'Looks clickable but cannot be reached with the keyboard',
       message, selector: selector(el), html: el.outerHTML.replace(/\s+/g, ' ').slice(0, 160),
@@ -59,22 +59,22 @@ export async function checkUnreachable(page) {
 }
 
 // Marks submenus in navigation that are hidden until something reveals them, and returns
-// how many there are. Each gets data-focuswalk-menu="<n>" on the item that owns it.
+// how many there are. Each gets data-accessready-menu="<n>" on the item that owns it.
 function markHiddenMenus() {
   const shown = (el) => { const r = el.getBoundingClientRect(); const cs = getComputedStyle(el); return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none' && +cs.opacity > 0.05; };
   let n = 0;
   for (const item of document.querySelectorAll('nav li, header li, [role=navigation] li, [role=menubar] > *')) {
-    if (!shown(item) || item.parentElement.closest('[data-focuswalk-menu]')) continue;
+    if (!shown(item) || item.parentElement.closest('[data-accessready-menu]')) continue;
     const links = [...item.querySelectorAll('a[href]')];
     if (links.length < 2 || !links.slice(1).some((a) => !shown(a))) continue;
-    item.setAttribute('data-focuswalk-menu', String(n++));
+    item.setAttribute('data-accessready-menu', String(n++));
   }
   return n;
 }
 
 function menuState(index) {
   const shown = (el) => { const r = el.getBoundingClientRect(); const cs = getComputedStyle(el); return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none' && +cs.opacity > 0.05; };
-  const item = document.querySelector(`[data-focuswalk-menu="${index}"]`);
+  const item = document.querySelector(`[data-accessready-menu="${index}"]`);
   if (!item) return null;
   const links = [...item.querySelectorAll('a[href]')];
   const trigger = item.querySelector('a[href], button, [tabindex]:not([tabindex^="-"])');
@@ -94,7 +94,7 @@ export async function checkHoverMenus(page) {
   const issues = [];
   const count = Math.min(await page.evaluate(markHiddenMenus), MAX_MENUS);
   for (let i = 0; i < count; i++) {
-    const item = page.locator(`[data-focuswalk-menu="${i}"]`);
+    const item = page.locator(`[data-accessready-menu="${i}"]`);
     const before = await page.evaluate(menuState, i);
     if (!before) continue;
     if (!(await item.hover({ timeout: 2000 }).then(() => true, () => false))) continue;
@@ -109,7 +109,7 @@ export async function checkHoverMenus(page) {
     let reached = false;
     const more = async () => ((await page.evaluate(menuState, i))?.visible ?? 0) > before.visible;
     if (before.hasTrigger) {
-      await page.evaluate((n) => document.querySelector(`[data-focuswalk-menu="${n}"]`).querySelector('a[href], button, [tabindex]:not([tabindex^="-"])').focus(), i);
+      await page.evaluate((n) => document.querySelector(`[data-accessready-menu="${n}"]`).querySelector('a[href], button, [tabindex]:not([tabindex^="-"])').focus(), i);
       await page.waitForTimeout(PAUSE);
       reached = await more();
       if (!reached && before.triggerIsButton) {
@@ -121,7 +121,7 @@ export async function checkHoverMenus(page) {
       }
     }
     if (!reached) {
-      await page.evaluate((n) => document.querySelector(`[data-focuswalk-menu="${n}"]`).querySelectorAll('a[href]')[1]?.focus(), i);
+      await page.evaluate((n) => document.querySelector(`[data-accessready-menu="${n}"]`).querySelectorAll('a[href]')[1]?.focus(), i);
       await page.waitForTimeout(PAUSE);
       reached = await more();
     }
@@ -130,13 +130,13 @@ export async function checkHoverMenus(page) {
 
     const hiddenLinks = hovered.visible - before.visible;
     issues.push({
-      id: 'hover-only-menu', source: 'focuswalk', kind: 'failure', wcag: ['2.1.1'], impact: 'critical',
+      id: 'hover-only-menu', source: 'accessready', kind: 'failure', wcag: ['2.1.1'], impact: 'critical',
       title: 'Menu opens on mouse hover only',
       message: `the menu under "${before.label}" opens when the mouse hovers over it but not from the keyboard, so ${hiddenLinks} link${hiddenLinks === 1 ? '' : 's'} cannot be reached without a mouse`,
       selector: `nav item "${before.label}"`, html: before.html,
     });
   }
-  await page.evaluate(() => document.querySelectorAll('[data-focuswalk-menu]').forEach((el) => el.removeAttribute('data-focuswalk-menu')));
+  await page.evaluate(() => document.querySelectorAll('[data-accessready-menu]').forEach((el) => el.removeAttribute('data-accessready-menu')));
   return issues;
 }
 
@@ -146,13 +146,13 @@ function markDisclosures() {
   // Buttons only: pressing Enter on a link or a submit button would leave the page.
   for (const el of document.querySelectorAll('button[aria-expanded="false"], [role=button][aria-expanded="false"]')) {
     if (!shown(el) || el.disabled || el.getAttribute('aria-disabled') === 'true' || el.type === 'submit') continue;
-    el.setAttribute('data-focuswalk-toggle', String(n++));
+    el.setAttribute('data-accessready-toggle', String(n++));
   }
   return n;
 }
 
 function toggleState(index) {
-  const el = document.querySelector(`[data-focuswalk-toggle="${index}"]`);
+  const el = document.querySelector(`[data-accessready-toggle="${index}"]`);
   if (!el) return null;
   const shown = (d) => { const r = d.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(d).visibility !== 'hidden'; };
   const dialog = [...document.querySelectorAll('dialog[open], [role=dialog], [role=alertdialog]')].find(shown) || null;
@@ -173,7 +173,7 @@ export async function checkDisclosures(page) {
   const startUrl = page.url();
   const count = Math.min(await page.evaluate(markDisclosures), MAX_DISCLOSURES);
   for (let i = 0; i < count; i++) {
-    const el = page.locator(`[data-focuswalk-toggle="${i}"]`);
+    const el = page.locator(`[data-accessready-toggle="${i}"]`);
     const state = () => page.evaluate(toggleState, i);
     const before = await state();
     if (!before || before.expanded) continue;
@@ -195,7 +195,7 @@ export async function checkDisclosures(page) {
       await page.waitForTimeout(PAUSE);
       if ((await state())?.expanded) {
         issues.push({
-          id: 'keyboard-activation', source: 'focuswalk', kind: 'failure', wcag: ['2.1.1'], impact: 'critical',
+          id: 'keyboard-activation', source: 'accessready', kind: 'failure', wcag: ['2.1.1'], impact: 'critical',
           title: 'Button works with the mouse but not the keyboard',
           message: `"${before.label}" opens when clicked but not when Enter or Space is pressed`,
           ...where,
@@ -209,7 +209,7 @@ export async function checkDisclosures(page) {
     const open = await state();
     if (open.dialogOpen && !before.dialogOpen && !open.focusInDialog) {
       issues.push({
-        id: 'dialog-focus', source: 'focuswalk', kind: 'advice', wcag: ['2.4.3'], impact: 'moderate',
+        id: 'dialog-focus', source: 'accessready', kind: 'advice', wcag: ['2.4.3'], impact: 'moderate',
         title: 'Dialog opens without taking keyboard focus',
         message: `"${before.label}" opens a dialog but keyboard focus stays on the page behind it`,
         ...where,
@@ -225,6 +225,6 @@ export async function checkDisclosures(page) {
     }
     if ((await state())?.expanded) { notes.push(`"${before.label}" could not be closed again; the remaining buttons on this page were not operated`); break; }
   }
-  await page.evaluate(() => document.querySelectorAll('[data-focuswalk-toggle]').forEach((el) => el.removeAttribute('data-focuswalk-toggle'))).catch(() => {});
+  await page.evaluate(() => document.querySelectorAll('[data-accessready-toggle]').forEach((el) => el.removeAttribute('data-accessready-toggle'))).catch(() => {});
   return { issues, notes };
 }

@@ -61,7 +61,7 @@ export const criterionLabel = (wcag) => wcag.length
   ? wcag.map((n) => (CRITERIA[n] ? `${n} ${CRITERIA[n]}` : n)).join(', ')
   : 'Best practice';
 
-// Why each of focuswalk's own checks matters, in plain words, for the HTML report.
+// Why each of accessready's own checks matters, in plain words, for the HTML report.
 export const WHY = {
   'focus-visible': 'People who use a keyboard instead of a mouse move through a page with the Tab key. If nothing on screen shows which link or button is selected, they cannot tell where they are.',
   'focus-caret-only': 'A thin text cursor is easy to miss, especially for people with low vision. An outline around the field makes the selected field obvious.',
