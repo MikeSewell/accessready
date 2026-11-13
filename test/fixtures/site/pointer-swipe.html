@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Swipe-only carousel</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  button, input, select { font: inherit; }
+  /* Targets of 48px and a solid 3px ring, so the page passes 2.5.5 and 2.4.13 unless it
+     plants something else on purpose. */
+  .big { display: inline-block; min-width: 48px; min-height: 48px; padding: 10px 16px; box-sizing: border-box; }
+  :focus-visible { outline: 3px solid #0b4a8f; outline-offset: 2px; }
+  .carousel { overflow: hidden; width: 100%; max-width: 400px; border: 1px solid #555; padding: 8px; box-sizing: border-box; }
+  .track { display: flex; transition: transform 0.3s; }
+  .slide { flex: 0 0 100%; margin: 0; padding: 24px; box-sizing: border-box; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Swipe-only carousel</h1>
+  <div id="stories" class="carousel" aria-roledescription="carousel" aria-label="Stories">
+    <div class="track"><p class="slide">First story</p><p class="slide">Second story</p><p class="slide">Third story</p></div>
+  </div>
+</main>
+<script>
+  const track = document.querySelector('.track');
+  let x0 = null, at = 0;
+  track.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; }, { passive: true });
+  track.addEventListener('touchmove', (e) => {
+    if (x0 === null) return;
+    const dx = e.touches[0].clientX - x0;
+    if (Math.abs(dx) > 50) { at = Math.max(0, Math.min(2, at + (dx < 0 ? 1 : -1))); track.style.transform = `translateX(${-100 * at}%)`; x0 = null; }
+  }, { passive: true });
+</script>
+</body>
+</html>

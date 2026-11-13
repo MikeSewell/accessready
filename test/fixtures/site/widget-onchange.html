@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dropdown that loads a page</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  button, input, select { font: inherit; }
+  /* Targets of 48px and a solid 3px ring, so the page passes 2.5.5 and 2.4.13 unless it
+     plants something else on purpose. */
+  .big { display: inline-block; min-width: 48px; min-height: 48px; padding: 10px 16px; box-sizing: border-box; }
+  :focus-visible { outline: 3px solid #0b4a8f; outline-offset: 2px; }
+
+</style>
+</head>
+<body>
+<main>
+  <h1>Dropdown that loads a page</h1>
+  <p><label for="sort">Sort by</label>
+  <select id="sort" class="big"><option value="new">Newest</option><option value="old">Oldest</option></select></p>
+</main>
+<script>
+  document.getElementById('sort').addEventListener('change', (e) => { location.href = 'results.html?sort=' + e.target.value; });
+</script>
+</body>
+</html>

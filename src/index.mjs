@@ -179,9 +179,11 @@ async function auditPage(browser, url, viewport, opts) {
     result.issues.push(...axe.issues, ...contrast.issues, ...video, ...unreachable, ...spacing);
     await runPhase('measure');
 
-    const keyboard = await walkKeyboard(page, { maxStops: opts.maxTabStops, level: opts.level });
+    // `fresh` lets the walk confirm, in a copy of the page, what it saw happen on focus.
+    const keyboard = await walkKeyboard(page, { maxStops: opts.maxTabStops, level: opts.level, fresh });
     result.tabStops = keyboard.stops;
     result.issues.push(...keyboard.issues);
+    result.notes.push(...(keyboard.notes || []));
     if (keyboard.capped) result.notes.push(`stopped after ${opts.maxTabStops} tab stops; the rest of the page was not walked`);
     if (keyboard.framesSkipped) result.notes.push(`${keyboard.framesSkipped} embedded frame(s) take focus; focus inside them was not checked`);
     for (const name of keyboard.dialogsOpened) result.notes.push(`a popup ("${name}") opened during the audit and covered the page; what is behind it was not fully walked. Use --storage-state with the popup already dismissed to audit the page itself`);

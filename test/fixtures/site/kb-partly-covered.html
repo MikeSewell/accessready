@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Focus partly covered</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  button, input, select { font: inherit; }
+  /* Targets of 48px and a solid 3px ring, so the page passes 2.5.5 and 2.4.13 unless it
+     plants something else on purpose. */
+  .big { display: inline-block; min-width: 48px; min-height: 48px; padding: 10px 16px; box-sizing: border-box; }
+  :focus-visible { outline: 3px solid #0b4a8f; outline-offset: 2px; }
+  main { padding-bottom: 0; }
+  .spacer { height: 2000px; }
+  #tall { display: block; height: 260px; padding: 16px; box-sizing: border-box; border: 1px solid #555; }
+  #bar { position: fixed; left: 0; right: 0; bottom: 0; height: 120px; background: #1c2733; color: #fff; padding: 0 24px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Focus partly covered</h1>
+  <p><a class="big" href="clean.html">A link at the top</a></p>
+  <div class="spacer"></div>
+  <a id="tall" href="clean.html">A tall card link at the bottom of the page</a>
+</main>
+<aside id="bar" aria-label="Announcement"><p>A bar fixed to the bottom of the window.</p></aside>
+</body>
+</html>

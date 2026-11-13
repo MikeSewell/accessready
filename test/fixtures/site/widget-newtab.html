@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Links to new tabs</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  button, input, select { font: inherit; }
+  /* Targets of 48px and a solid 3px ring, so the page passes 2.5.5 and 2.4.13 unless it
+     plants something else on purpose. */
+  .big { display: inline-block; min-width: 48px; min-height: 48px; padding: 10px 16px; box-sizing: border-box; }
+  :focus-visible { outline: 3px solid #0b4a8f; outline-offset: 2px; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Links to new tabs</h1>
+  <p><a id="quiet" class="big" href="nav-a.html" target="_blank">Our partners</a></p>
+  <p><a class="big" href="nav-b.html" target="_blank">Annual report <span class="sr">(opens in a new tab)</span></a></p>
+  <p><a class="big" href="nav-c.html" target="_blank">Volunteer handbook <img src="photo.png" alt="opens in new window" width="16" height="16"></a></p>
+  <p><a class="big" href="nav-d.html" target="_self">Same window</a></p>
+</main>
+</body>
+</html>

@@ -42,7 +42,8 @@ test('the report groups problems by rule and escapes page content', () => {
 
 test('console output lists every page and a failures-by-rule table', () => {
   const out = renderConsole(failing);
-  assert.match(out, /^\/focus\.html {2}1 failure {2}1 best-practice note {2}5 tab stops$/m);
+  // The likely problem is the pale wrapper ring on focus.html, flagged under 1.4.11.
+  assert.match(out, /^\/focus\.html {2}1 failure {2}1 likely problem {2}1 best-practice note {2}5 tab stops$/m);
   assert.match(out, /^Failures by rule$/m);
   assert.match(out, /1 page could not be audited/);
   assert.doesNotMatch(out, /\x1b\[/, 'no color codes unless asked for');
