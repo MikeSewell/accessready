@@ -10,8 +10,8 @@ import { startSite } from './helpers.mjs';
 const MINE = new Set([...Object.keys(rules), ...Object.keys(contrastRules)]);
 const found = (page) => page.issues.filter((i) => MINE.has(i.id)).map((i) => [i.kind, i.id, i.selector]);
 
-const AA = ['visual-vw', 'visual-zoom-clip', 'visual-zoom-overlap', 'visual-field', 'visual-icon', 'visual-image-text', 'visual-enhanced', 'visual-presentation', 'visual-clean'];
-const AAA = ['visual-enhanced', 'visual-presentation', 'visual-wide', 'visual-clean'];
+const AA = ['visual-vw', 'visual-zoom-clip', 'visual-zoom-overlap', 'visual-field', 'visual-icon', 'visual-icon-over', 'visual-image-text', 'visual-enhanced', 'visual-presentation', 'visual-clean'];
+const AAA = ['visual-enhanced', 'visual-presentation', 'visual-wide', 'reflow-hidden', 'visual-clean'];
 const PHONE = ['visual-orientation', 'visual-clean'];
 let site, aa, aaa, phone;
 const page = (result, list, name) => result.pages[list.indexOf(name)];
@@ -54,6 +54,14 @@ test('a faint field border and a faint icon button fail 1.4.11 with their measur
   assert.match(message(icon, 'faint-icon-control'), /"Share" reaches 1\.74:1/);
 });
 
+test('an icon over something painted underneath is left alone; one on plain white is still measured', () => {
+  // A white menu icon in a transparent fixed header over a dark hero, and white carousel
+  // arrows over a photo: what is behind them is not their own background, so no ratio is
+  // given. The faint grey icon on white beside them still fails.
+  const p = page(aa, AA, 'visual-icon-over');
+  assert.deepEqual(found(p), [['failure', 'faint-icon-control', '#share']]);
+});
+
 test('an image of text is read with OCR and flagged for 1.4.5 and 1.4.9', (t) => {
   const p = page(aa, AA, 'visual-image-text');
   const note = p.notes.find((n) => /images were not read for text/.test(n));
@@ -84,6 +92,10 @@ test('a page that scrolls sideways at 200% zoom is flagged at AAA', () => {
   const p = page(aaa, AAA, 'visual-wide');
   assert.deepEqual(found(p), [['likely', 'zoom-sideways-scroll', 'html']]);
   assert.match(message(p, 'zoom-sideways-scroll'), /^at 200% zoom in a 1440px wide window the page scrolls sideways by \d+px$/);
+});
+
+test('overflow put out of reach by overflow-x: hidden is not sideways scrolling at 200% zoom', () => {
+  assert.deepEqual(found(page(aaa, AAA, 'reflow-hidden')), []);
 });
 
 test('visual done right reports nothing, at AA, AAA and on a phone', () => {

@@ -2,16 +2,23 @@
 // reported for each, so a check that goes quiet or starts over-reporting fails here.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { chromium } from 'playwright';
 import { audit } from '../src/index.mjs';
-import { startSite, ids } from './helpers.mjs';
+import { checkReflow } from '../src/checks/layout.mjs';
+import { startSite, ids, tripwires } from './helpers.mjs';
 
 const PAGES = ['clean', 'focus', 'obscured', 'reflow', 'video', 'rules', 'headings', 'banner', 'frame', 'shadow', 'skiplink', 'popup', 'popup-behind', 'trap', 'unreachable', 'spacing', 'menu', 'toggle', 'overimage', 'inventory'];
-let site, result;
+// Pages that try to take the audit somewhere else, or hide overflow out of reach.
+const STAY = ['interact-link-button', 'interact-menu-link', 'interact-pushstate', 'reflow-hidden'];
+const wires = tripwires('/left.html');
+let site, result, stay;
 const page = (name) => result.pages[PAGES.indexOf(name)];
+const stayed = (name) => stay.pages[STAY.indexOf(name)];
 
 before(async () => {
-  site = await startSite();
+  site = await startSite(wires.routes);
   result = await audit(site.origin, { viewports: ['desktop'], paths: PAGES.map((p) => `/${p}.html`), concurrency: 3 });
+  stay = await audit(site.origin, { viewports: ['desktop'], paths: STAY.map((p) => `/${p}.html`) });
 });
 after(() => site.close());
 
@@ -49,6 +56,53 @@ test('sideways scroll at 320px is reported and names the widest element', () => 
   const p = page('reflow');
   assert.deepEqual(ids(p), ['reflow']);
   assert.match(p.issues[0].message, /^428px of sideways scroll at 320px wide; widest: #wide-box$/);
+});
+
+test('overflow put out of reach by overflow-x: hidden is not sideways scrolling', () => {
+  // An off-canvas menu parked at left: 100% under body { overflow-x: hidden } makes the page
+  // wider than the window, but nobody can scroll to it.
+  assert.deepEqual(ids(stayed('reflow-hidden')), []);
+});
+
+test('reflow puts the window back the size it was', async () => {
+  // Checks that run after reflow on the same page must see the desktop layout, not 320px.
+  const browser = await chromium.launch({ channel: 'chrome' });
+  try {
+    const p = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    await p.goto(`${site.origin}/reflow.html`);
+    const found = await checkReflow(p);
+    assert.deepEqual(found.map((i) => i.id), ['reflow']);
+    assert.match(found[0].message, /at 320px wide/);
+    assert.deepEqual(p.viewportSize(), { width: 1440, height: 900 });
+    assert.equal(await p.evaluate(() => innerWidth), 1440);
+  } finally {
+    await browser.close();
+  }
+});
+
+test('pressing Enter on a link with role="button" never takes the audit off the page', () => {
+  const p = stayed('interact-link-button');
+  assert.equal(p.error, null);
+  // Reflow found the wide box, so it measured this page and not the one the link points at.
+  assert.deepEqual(ids(p), ['reflow']);
+  assert.match(p.issues.find((i) => i.id === 'reflow').message, /widest: #wide-box$/);
+  assert.equal(wires.hits['/left.html'], 0);
+});
+
+test('a hover menu behind a link with role="button" is still tested, on the same page', () => {
+  const p = stayed('interact-menu-link');
+  assert.equal(p.error, null);
+  assert.deepEqual(ids(p), ['hover-only-menu']);
+  assert.match(p.issues.find((i) => i.id === 'hover-only-menu').message, /^the menu under "Programs" opens when the mouse hovers over it but not from the keyboard, so 2 links/);
+  assert.equal(wires.hits['/left.html'], 0);
+});
+
+test('a button that rewrites the address sends the audit back to the audited page', () => {
+  const p = stayed('interact-pushstate');
+  assert.equal(p.error, null);
+  assert.ok(p.notes.some((n) => /^the address changed to .*\/gallery-view while the page was being used, so it was loaded again/.test(n)), p.notes.join('; '));
+  // Reflow measured the page as audited, with its wide box, not the view the button swapped in.
+  assert.deepEqual(ids(p), ['reflow']);
 });
 
 test('a looping video fails only when there is no pause control', () => {

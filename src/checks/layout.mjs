@@ -26,14 +26,46 @@ export async function checkMovingVideo(page) {
   });
 }
 
+// In the page: how far a visitor can scroll the page sideways, in CSS pixels. The page being
+// wider than the window is not enough. overflow-x: hidden or clip on the root (or on body,
+// which the root takes it from when its own is visible) puts the overflow out of reach: an
+// off-canvas menu parked at left: 100% is the usual case. Script can still scroll a hidden
+// root, so that is read from the styles; for the rest the page is scrolled as far right as it
+// goes and put back.
+export function sidewaysScroll() {
+  const root = document.documentElement;
+  if (root.scrollWidth - innerWidth <= 0) return 0;
+  const own = getComputedStyle(root).overflowX;
+  const used = own === 'visible' && document.body ? getComputedStyle(document.body).overflowX : own;
+  if (/hidden|clip/.test(used)) return 0;
+  const x = scrollX, y = scrollY;
+  window.scrollTo({ left: 1e5, top: y, behavior: 'instant' });
+  const reach = scrollX;
+  window.scrollTo({ left: x, top: y, behavior: 'instant' });
+  return Math.round(reach);
+}
+
 // 1.4.10 Reflow: at 320 CSS pixels wide (a 1280px screen zoomed to 400%) the page must not
-// scroll sideways. Resizes the page, so run it last.
+// scroll sideways. The window is put back to its size afterwards, so the checks that run
+// after this one see the page at the screen size they report for.
 export async function checkReflow(page) {
+  const size = page.viewportSize();
   await page.setViewportSize({ width: 320, height: 640 });
-  await page.waitForTimeout(400);
-  return page.evaluate(() => {
-    const overflow = document.documentElement.scrollWidth - innerWidth;
-    if (overflow <= 0) return [];
+  try {
+    await page.waitForTimeout(400);
+    return await measureReflow(page);
+  } finally {
+    if (size) {
+      await page.setViewportSize(size);
+      await page.waitForTimeout(400);
+    }
+  }
+}
+
+async function measureReflow(page) {
+  const overflow = await page.evaluate(sidewaysScroll);
+  if (overflow <= 0) return [];
+  return page.evaluate((overflow) => {
     // Point at the elements sticking out furthest, skipping ones that only contain a wider child.
     const wide = [...document.body.querySelectorAll('*')]
       .map((el) => ({ el, right: el.getBoundingClientRect().right }))
@@ -50,7 +82,7 @@ export async function checkReflow(page) {
       selector: first ? describe(first) : 'html',
       html: first ? first.outerHTML.replace(/\s+/g, ' ').slice(0, 160) : '',
     }];
-  });
+  }, overflow);
 }
 
 // Adds CSS through the CSSOM instead of a <style> tag, so a page whose Content Security
@@ -119,7 +151,7 @@ export const rules = {
   },
   reflow: {
     title: 'Page scrolls sideways at 320px wide', criteria: ['1.4.10'], kinds: ['failure'],
-    covers: 'Sideways scrolling at 320px wide, with the widest element named.',
+    covers: 'Sideways scrolling a visitor can actually do at 320px wide, with the widest element named. Overflow the page puts out of reach (overflow-x: hidden or clip on the page itself) is left out.',
     why: 'People with low vision zoom the page to 400%. If the page then scrolls sideways, they have to scroll in two directions to read each line.',
   },
   'text-spacing': {

@@ -151,6 +151,8 @@ async function auditPage(browser, url, viewport, opts) {
       return result;
     }
     const { res, dismissed } = loaded;
+    // Where the page ended up after any redirect: the page every later check must be on.
+    const audited = page.url();
     result.status = res ? res.status() : null;
     if (res && res.status() >= 400) {
       result.error = `server answered ${res.status()}`;
@@ -257,6 +259,14 @@ async function auditPage(browser, url, viewport, opts) {
       const toggles = await timed(result, 'disclosures', () => checkDisclosures(page));
       result.issues.push(...toggles.issues);
       result.notes.push(...toggles.notes);
+    }
+    // Those checks press keys on this page. guard() keeps it from loading another one, but a
+    // script can still rewrite the address (history.pushState) and swap what is shown. Then
+    // the page is loaded again, so reflow and the checks after it measure the audited page.
+    const withoutHash = (u) => u.replace(/#.*$/, '');
+    if (withoutHash(page.url()) !== withoutHash(audited)) {
+      result.notes.push(`the address changed to ${page.url()} while the page was being used, so it was loaded again before the remaining checks`);
+      await timed(result, 'load', () => loadPage(page, audited, opts));
     }
     // Reflow is defined at 320 CSS pixels on a desktop browser zoomed to 400%. A phone
     // emulation lays a page out differently, so it is measured from desktop windows only.

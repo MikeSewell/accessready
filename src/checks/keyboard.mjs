@@ -1,7 +1,8 @@
 // Walks the page with the Tab key, the way a keyboard user does, and at every stop checks:
-//   2.4.7  Focus Visible: does anything on screen change when the element takes focus?
+//   2.4.7  Focus Visible: does anything on screen change when the element takes focus? Is
+//          the focused element on screen at all?
 //   2.4.11 Focus Not Obscured (Minimum): is the focused element entirely hidden behind
-//          something else (sticky header, cookie banner, chat bubble) or off screen?
+//          something else (sticky header, cookie banner, chat bubble)?
 //   2.4.12 Focus Not Obscured (Enhanced): is any part of it covered?
 //   1.4.11 and 2.4.13: does the indicator reach 3:1 against how the same pixels looked
 //          before, and (AAA) is that part as large as a 2px outline around the element?
@@ -461,15 +462,19 @@ export async function walkKeyboard(page, { maxStops = 150, level = 'AA', fresh =
       stops--;
       break;
     }
-    if (f.visible === 0) {
-      issues.push({
-        id: 'focus-not-obscured', source: 'accessready', kind: 'failure', wcag: ['2.4.11'], impact: 'serious',
-        title: 'Focused element is hidden',
-        message: f.onScreen === 0
-          ? `${what} takes keyboard focus while off screen, so the user cannot see where they are`
-          : `${what} takes keyboard focus while completely covered by ${f.coveredBy || 'another element'}`,
+    if (f.visible === 0 && f.onScreen === 0) {
+      // Nothing covers it: it is outside the window (moved off with a transform or a large
+      // negative offset), where the browser cannot scroll it into view. 2.4.11 is about focus
+      // hidden behind content the author put over it; focus nobody can see at all is 2.4.7.
+      issues.push(issue('focus-visible', {
+        message: `${what} takes keyboard focus while off screen, so the user cannot see where they are`,
         ...where,
-      });
+      }));
+    } else if (f.visible === 0) {
+      issues.push(issue('focus-not-obscured', {
+        message: `${what} takes keyboard focus while completely covered by ${f.coveredBy || 'another element'}`,
+        ...where,
+      }));
     } else if (changed !== null && changed < MIN_CHANGED_PIXELS) {
       // WCAG counts the text cursor as a focus indicator, so a text field with nothing else
       // is weak but not a failure.
@@ -540,7 +545,7 @@ export async function walkKeyboard(page, { maxStops = 150, level = 'AA', fresh =
 export const rules = {
   'focus-visible': {
     title: 'No visible focus indicator', criteria: ['2.4.7'], kinds: ['failure'],
-    covers: 'Every Tab stop is screenshotted focused and unfocused; if nothing on screen changes, it fails.',
+    covers: 'Every Tab stop is screenshotted focused and unfocused; if nothing on screen changes, it fails. A stop that takes focus outside the window, where it cannot be scrolled into view, fails too.',
     why: 'People who use a keyboard instead of a mouse move through a page with the Tab key. If nothing on screen shows which link or button is selected, they cannot tell where they are.',
   },
   'focus-caret-only': {
@@ -550,7 +555,7 @@ export const rules = {
   },
   'focus-not-obscured': {
     title: 'Focused element is hidden', criteria: ['2.4.11'], kinds: ['failure'],
-    covers: 'Every Tab stop is checked for being completely covered by something else or off screen.',
+    covers: 'Every Tab stop is checked for being completely covered by something else on the page.',
     why: 'When the selected link or button is covered by a sticky header, a cookie banner or a chat bubble, a keyboard user is working blind.',
   },
   'focus-partly-obscured': {

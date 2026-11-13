@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hover menu behind a link button</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main, header { padding: 24px; }
+  a { color: #0b4a8f; }
+  .bar { list-style: none; margin: 0; padding: 0; display: flex; gap: 32px; }
+  .bar > li { position: relative; padding: 8px 0; }
+  .sub { display: none; position: absolute; top: 100%; left: 0; margin: 0; padding: 8px 16px; list-style: none; background: #fff; border: 1px solid #555; white-space: nowrap; }
+  .bar > li:hover > .sub { display: block; }
+  .sub a { display: block; padding: 4px 0; }
+</style>
+</head>
+<body>
+<header>
+  <nav aria-label="Main">
+    <ul class="bar">
+      <!-- The trigger is a link with role="button": Enter follows the link, and the menu
+           opens on hover only. -->
+      <li id="hover-only"><a href="left.html?from=menu" role="button">Programs</a>
+        <ul class="sub"><li><a href="clean.html">Youth</a></li><li><a href="clean.html">Seniors</a></li></ul></li>
+    </ul>
+  </nav>
+</header>
+<main>
+  <h1>Hover menu behind a link button</h1>
+  <p>The menu above opens on hover only.</p>
+</main>
+</body>
+</html>

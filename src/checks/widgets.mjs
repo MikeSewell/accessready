@@ -91,7 +91,10 @@ function markWidgets(max) {
   const referenced = (el, attr) => (el.getAttribute(attr) || '').split(/\s+/).filter(Boolean).map((id) => document.getElementById(id)).filter(Boolean);
   const mark = (list, kind) => list.slice(0, max).map((el, i) => { el.setAttribute('data-accessready-widget', `${kind}-${i}`); return { key: `${kind}-${i}`, what: `${el.tagName.toLowerCase()}${labelOf(el) ? ` "${labelOf(el)}"` : ''}`, label: labelOf(el), selector: selectorOf(el), html: htmlOf(el) }; });
   // Buttons in role only: a tab or a menu item that controls a panel is tested as a tab or menu.
-  const buttons = [...document.querySelectorAll('button, [role=button]')].filter((b) => shown(b) && !b.disabled && b.type !== 'submit' && b.getAttribute('aria-disabled') !== 'true' && (b.getAttribute('role') || 'button') === 'button');
+  // A button that submits a form is left alone. A <button> with no type is "submit" even
+  // outside a form, where it submits nothing (WordPress menu toggles are written that way),
+  // so what counts is whether it belongs to a form.
+  const buttons = [...document.querySelectorAll('button, [role=button]')].filter((b) => shown(b) && !b.disabled && !(b.form && b.type === 'submit') && b.getAttribute('aria-disabled') !== 'true' && (b.getAttribute('role') || 'button') === 'button');
   const opensDialog = (b) => b.getAttribute('aria-haspopup') === 'dialog' || referenced(b, 'aria-controls').some((t) => t.matches('dialog, [role=dialog], [role=alertdialog]'));
   return {
     disclosures: mark(buttons.filter((b) => b.hasAttribute('aria-controls') && referenced(b, 'aria-controls').length && !opensDialog(b)), 'disclosure'),

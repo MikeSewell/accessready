@@ -1,6 +1,9 @@
 // Checks that operate the page the way a keyboard user would: things that can be clicked
 // but not reached, menus that only open on hover, and buttons that only answer the mouse.
-// These change the page's state, so they run after everything that only looks.
+// These change the page's state, so they run after everything that only looks. They run on
+// the page the other checks use, so the menu and button checks run behind guard(): a key
+// press that would load another page is answered with "no content" and the page stays.
+import { guard } from './observe.mjs';
 
 const MAX_MENUS = 8;
 const MAX_DISCLOSURES = 8;
@@ -94,6 +97,11 @@ function menuState(index) {
 // 2.1.1 Keyboard: a submenu that opens when the mouse hovers but not when the keyboard
 // focuses it leaves every link inside it out of reach.
 export async function checkHoverMenus(page) {
+  const g = await guard(page, { writes: true });
+  try { return await hoverMenus(page); } finally { await g.stop(); }
+}
+
+async function hoverMenus(page) {
   const issues = [];
   const count = Math.min(await page.evaluate(markHiddenMenus), MAX_MENUS);
   for (let i = 0; i < count; i++) {
@@ -146,9 +154,12 @@ export async function checkHoverMenus(page) {
 function markDisclosures() {
   const shown = (el) => { const r = el.getBoundingClientRect(); const cs = getComputedStyle(el); return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none' && +cs.opacity > 0; };
   let n = 0;
-  // Buttons only: pressing Enter on a link or a submit button would leave the page.
+  // Not a button that submits a form. A <button> with no type is "submit" even outside a
+  // form, where it submits nothing (WordPress menu toggles are written that way), so what
+  // counts is whether it belongs to a form. A link with role="button" is kept: guard()
+  // stops it leaving the page, and checkDisclosures skips it if a key press tries to.
   for (const el of document.querySelectorAll('button[aria-expanded="false"], [role=button][aria-expanded="false"]')) {
-    if (!shown(el) || el.disabled || el.getAttribute('aria-disabled') === 'true' || el.type === 'submit') continue;
+    if (!shown(el) || el.disabled || el.getAttribute('aria-disabled') === 'true' || (el.form && el.type === 'submit')) continue;
     el.setAttribute('data-accessready-toggle', String(n++));
   }
   return n;
@@ -171,6 +182,11 @@ function toggleState(index) {
 // 2.1.1 Keyboard: a button that announces it opens something (aria-expanded) has to open it
 // from the keyboard, not only on click. Also notes a dialog that opens without taking focus.
 export async function checkDisclosures(page) {
+  const g = await guard(page, { writes: true });
+  try { return await disclosures(page, g); } finally { await g.stop(); }
+}
+
+async function disclosures(page, g) {
   const issues = [];
   const notes = [];
   const startUrl = page.url();
@@ -184,13 +200,18 @@ export async function checkDisclosures(page) {
 
     if (!(await el.focus({ timeout: 2000 }).then(() => true, () => false))) continue;
     let opened = false;
+    const loads = g.navigations().length;
     for (const key of ['Enter', 'Space']) {
       await page.keyboard.press(key);
       await page.waitForTimeout(PAUSE);
-      if (page.url() !== startUrl) break;
+      if (page.url() !== startUrl || g.navigations().length > loads) break;
       if ((opened = (await state())?.expanded ?? false)) break;
     }
-    if (page.url() !== startUrl) { notes.push('a button navigated away while being tested; the remaining buttons on this page were not operated'); break; }
+    // A script that rewrites the address (history.pushState) has changed what is on screen.
+    if (page.url() !== startUrl) { notes.push('a button changed the page address while being tested; the remaining buttons on this page were not operated'); break; }
+    // The key tried to load another page, which guard() stopped: this is a link, not a button
+    // that opens something here, so it has nothing to fail.
+    if (g.navigations().length > loads) continue;
 
     if (!opened) {
       // Only a failure if the mouse can do what the keyboard could not.

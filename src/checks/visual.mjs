@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { gunzipSync } from 'node:zlib';
 import { PNG } from 'pngjs';
 import { issue } from './index.mjs';
-import { addStyles } from './layout.mjs';
+import { addStyles, sidewaysScroll } from './layout.mjs';
 
 const ZOOM_SETTLE = 250;
 const MAX_TEXT = 1500;
@@ -140,7 +140,6 @@ function zoomState(record) {
       .map((el) => ({ selector: describe(el), html: el.outerHTML.replace(/\s+/g, ' ').slice(0, 160), text: text(el) })),
     overlaps: overlaps.filter((o) => !z.overlaps.has(o.key) && !seen.has(o.key) && seen.add(o.key))
       .map((o) => ({ selector: describe(o.a), html: o.a.outerHTML.replace(/\s+/g, ' ').slice(0, 160), text: text(o.a), other: text(o.b) })),
-    sideways: document.documentElement.scrollWidth - innerWidth,
   };
 }
 
@@ -165,6 +164,8 @@ async function checkZoom(page, ctx) {
   await page.evaluate(zoomState, true);
   await resize(page, { width: Math.round(width / 2), height: Math.round(height / 2) });
   const at200 = await page.evaluate(zoomState, false);
+  // Only sideways scrolling a visitor can do: not overflow the page hides out of reach.
+  const sideways = await page.evaluate(sidewaysScroll);
   const sizes200 = await page.evaluate(fontSizes);
   await resize(page, { width: Math.round(width / 4), height: Math.round(height / 4) });
   const sizes400 = await page.evaluate(fontSizes);
@@ -195,8 +196,8 @@ async function checkZoom(page, ctx) {
   for (const o of at200.overlaps.slice(0, MAX_REPORTED)) {
     issues.push(issue('zoom-overlapping-text', { selector: o.selector, html: o.html, message: `"${o.text}" is drawn over "${o.other}" at 200% zoom and was not at 100%` }));
   }
-  if (at200.sideways > 0) {
-    issues.push(issue('zoom-sideways-scroll', { selector: 'html', message: `at 200% zoom in a ${width}px wide window the page scrolls sideways by ${at200.sideways}px` }));
+  if (sideways > 0) {
+    issues.push(issue('zoom-sideways-scroll', { selector: 'html', message: `at 200% zoom in a ${width}px wide window the page scrolls sideways by ${sideways}px` }));
   }
   return issues;
 }
@@ -353,6 +354,45 @@ function nonTextContrast(defaults) {
     }
     return false;
   };
+  // Is something painted under the icon that is not one of its own backgrounds? backgroundOf
+  // only reads the control's ancestors, and falls back to white. A transparent header fixed
+  // over a dark hero, arrows laid over a carousel photo, a button over a video: the color
+  // there cannot be read from styles, so the icon is left alone rather than measured against
+  // a white that is not there. `start` is where backgroundOf began, `x` and `y` the icon's
+  // middle.
+  const REPLACED = 'img, picture, video, canvas, iframe, embed, object';
+  const paintedUnder = (el, start, x, y) => {
+    // The nearest ancestor with a solid color hides whatever is under it.
+    let floor = null;
+    for (let n = start; n && n.nodeType === 1; n = n.parentElement) {
+      const cs = getComputedStyle(n);
+      const c = parse(cs.backgroundColor);
+      if (c && c.a >= 1) { floor = n; break; }
+      // Fixed or sticky with no solid color of its own: what shows through changes as the
+      // page scrolls under it.
+      if (cs.position === 'fixed' || cs.position === 'sticky') return true;
+    }
+    // Everything at that point, top first. Past the control itself, anything that is not one
+    // of its ancestors is drawn between it and the background backgroundOf found. The browser
+    // only answers for points inside the window, and this check does not scroll the page.
+    if (x >= 0 && y >= 0 && x < innerWidth && y < innerHeight) {
+      const stack = document.elementsFromPoint(x, y);
+      const at = stack.findIndex((n) => n === el || el.contains(n));
+      if (at < 0) return true; // the control is covered there, or takes no pointer events
+      for (const n of stack.slice(at + 1)) {
+        if (el.contains(n)) continue;
+        if (n === floor) break;
+        if (!n.contains(el)) return true;
+      }
+    }
+    // Pictures that take no pointer events are not in that list; find them by where they are.
+    for (const m of document.querySelectorAll(REPLACED)) {
+      if (el.contains(m) || (floor && !floor.contains(m))) continue;
+      const r = m.getBoundingClientRect(), cs = getComputedStyle(m);
+      if (cs.visibility !== 'hidden' && +cs.opacity > 0 && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return true;
+    }
+    return false;
+  };
   let icons = 0;
   for (const el of document.querySelectorAll('button, a[href], [role=button], [role=link], summary')) {
     if (icons >= 20 || out.length >= 30) break;
@@ -364,6 +404,8 @@ function nonTextContrast(defaults) {
     if (svg) {
       if (svg.querySelector('image, foreignObject, linearGradient, radialGradient, pattern, filter, mask')) continue;
       behind = backgroundOf(svg.parentElement);
+      const r = svg.getBoundingClientRect();
+      if (behind && paintedUnder(el, svg.parentElement, r.left + r.width / 2, r.top + r.height / 2)) continue;
       for (const shape of svg.querySelectorAll('path, circle, rect, ellipse, line, polyline, polygon, text, use')) {
         const r = shape.getBoundingClientRect();
         if (r.width < 1 && r.height < 1) continue;
@@ -384,6 +426,8 @@ function nonTextContrast(defaults) {
       if (!icon) continue;
       const cs = icon === 'before' ? before : getComputedStyle(el);
       behind = backgroundOf(el);
+      const r = el.getBoundingClientRect();
+      if (behind && paintedUnder(el, el, r.left + r.width / 2, r.top + r.height / 2)) continue;
       const c = parse(cs.color);
       if (c) colors.push({ ...c, a: c.a * opacityOf(el) });
     }
@@ -637,7 +681,7 @@ export const rules = {
   },
   'zoom-sideways-scroll': {
     title: 'Page scrolls sideways at 200% zoom', criteria: ['1.4.8'], kinds: ['likely'],
-    covers: 'At level AAA, pages that scroll sideways at 200% zoom in a full desktop window.',
+    covers: 'At level AAA, pages a visitor can scroll sideways at 200% zoom in a full desktop window. Overflow the page puts out of reach (overflow-x: hidden or clip on the page itself) is left out.',
     why: 'Scrolling back and forth along every line is slow and tiring, and people with low vision who zoom lose their place doing it.',
   },
   'orientation-locked': {
@@ -652,7 +696,7 @@ export const rules = {
   },
   'faint-icon-control': {
     title: 'Icon button is too faint', criteria: ['1.4.11'], kinds: ['failure'],
-    covers: 'Buttons and links that show only an icon (an inline SVG or an icon font glyph) whose colors all stay under 3:1 against the background behind them.',
+    covers: 'Buttons and links that show only an icon (an inline SVG or an icon font glyph) whose colors all stay under 3:1 against the background behind them. Icons with something else painted under them (a photo, a video, a hero behind a transparent fixed header) are left alone, since that color cannot be read.',
     why: 'When an icon is the only thing that says what a button does, people with low vision need to be able to see it.',
   },
   'justified-text': {

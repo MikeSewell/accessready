@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Choices that save over a WebSocket</title>
+<style>
+  body { margin: 0; font: 18px/1.5 system-ui, sans-serif; color: #111; background: #fff; }
+  main { padding: 24px; }
+  a { color: #0b4a8f; }
+  button, input, select { font: inherit; padding: 8px 12px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Choices that save over a WebSocket</h1>
+  <!-- Every control here saves to the server the moment it is used, over a socket opened
+       when the page loads (the test passes the socket server's port as ?ws=). Nothing the
+       audit does may reach that server. -->
+  <p><input type="checkbox" id="newsletter"> <label for="newsletter">Send me the newsletter</label></p>
+  <p><label for="sort">Sort by</label> <select id="sort"><option>Newest</option><option>Oldest</option></select></p>
+  <p><button id="more" type="button" aria-expanded="false" aria-controls="more-panel">More options</button></p>
+  <div id="more-panel" hidden><p>More options.</p></div>
+</main>
+<script>
+  const ws = new WebSocket('ws://127.0.0.1:' + new URLSearchParams(location.search).get('ws') + '/save');
+  const save = (what) => { if (ws.readyState === 1) ws.send('save ' + what); };
+  document.getElementById('newsletter').addEventListener('change', (e) => save('newsletter=' + e.target.checked));
+  document.getElementById('sort').addEventListener('change', (e) => save('sort=' + e.target.value));
+  const more = document.getElementById('more'), panel = document.getElementById('more-panel');
+  more.addEventListener('click', () => {
+    const open = more.getAttribute('aria-expanded') !== 'true';
+    more.setAttribute('aria-expanded', String(open));
+    panel.hidden = !open;
+    save('more=' + open);
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { more.setAttribute('aria-expanded', 'false'); panel.hidden = true; } });
+</script>
+</body>
+</html>
