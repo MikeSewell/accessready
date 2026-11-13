@@ -15,7 +15,7 @@ export async function checkMovingVideo(page) {
       const hasControl = [...scope.querySelectorAll('button, [role=button]')].some((b) => /pause|play|stop/i.test(nameOf(b)));
       if (hasControl) continue;
       out.push({
-        id: 'moving-video', source: 'focuswalk', kind: 'failure', wcag: ['2.2.2'], impact: 'serious',
+        id: 'moving-video', source: 'accessready', kind: 'failure', wcag: ['2.2.2'], impact: 'serious',
         title: 'Video plays by itself with no pause control',
         message: `video ${v.loop ? 'loops' : 'autoplays'} and has no controls or pause button near it`,
         selector: v.id ? `#${CSS.escape(v.id)}` : 'video',
@@ -44,7 +44,7 @@ export async function checkReflow(page) {
     const describe = (el) => el.id ? `#${el.id}` : el.tagName.toLowerCase() + (typeof el.className === 'string' && el.className.trim() ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.') : '');
     const first = wide[0]?.el;
     return [{
-      id: 'reflow', source: 'focuswalk', kind: 'failure', wcag: ['1.4.10'], impact: 'serious',
+      id: 'reflow', source: 'accessready', kind: 'failure', wcag: ['1.4.10'], impact: 'serious',
       title: 'Page scrolls sideways at 320px wide',
       message: `${overflow}px of sideways scroll at 320px wide` + (wide.length ? `; widest: ${wide.map(({ el }) => describe(el)).join(', ')}` : ''),
       selector: first ? describe(first) : 'html',
@@ -59,11 +59,11 @@ export async function addStyles(page, css) {
   await page.evaluate((text) => {
     const sheet = new CSSStyleSheet();
     sheet.replaceSync(text);
-    (window.__focuswalkSheets ||= []).push(sheet);
+    (window.__accessreadySheets ||= []).push(sheet);
     document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
   }, css);
   return () => page.evaluate(() => {
-    const sheet = window.__focuswalkSheets.pop();
+    const sheet = window.__accessreadySheets.pop();
     document.adoptedStyleSheets = document.adoptedStyleSheets.filter((s) => s !== sheet);
   }).catch(() => {});
 }
@@ -83,8 +83,8 @@ function clippedText(mark) {
     if (!(el.innerText || '').trim()) continue;
     const cut = (hidesY && el.scrollHeight - el.clientHeight > 1) || (hidesX && el.scrollWidth - el.clientWidth > 1);
     if (!cut) continue;
-    if (mark) { el.setAttribute('data-focuswalk-clipped', ''); continue; }
-    if (el.hasAttribute('data-focuswalk-clipped')) continue;
+    if (mark) { el.setAttribute('data-accessready-clipped', ''); continue; }
+    if (el.hasAttribute('data-accessready-clipped')) continue;
     out.push({ el });
   }
   if (mark) return [];
@@ -92,7 +92,7 @@ function clippedText(mark) {
   const found = out.filter(({ el }) => !out.some((o) => o.el !== el && el.contains(o.el)));
   const describe = (el) => el.id ? `#${CSS.escape(el.id)}` : el.tagName.toLowerCase() + (typeof el.className === 'string' && el.className.trim() ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.') : '');
   return found.map(({ el }) => ({
-    id: 'text-spacing', source: 'focuswalk', kind: 'failure', wcag: ['1.4.12'], impact: 'serious',
+    id: 'text-spacing', source: 'accessready', kind: 'failure', wcag: ['1.4.12'], impact: 'serious',
     title: 'Text is cut off when spacing is increased',
     message: `"${(el.innerText || '').trim().replace(/\s+/g, ' ').slice(0, 40)}" is clipped once line, letter and word spacing are widened`,
     selector: describe(el),
@@ -106,7 +106,7 @@ export async function checkTextSpacing(page) {
   await page.waitForTimeout(150);
   const issues = await page.evaluate(clippedText, false);
   await remove();
-  await page.evaluate(() => document.querySelectorAll('[data-focuswalk-clipped]').forEach((el) => el.removeAttribute('data-focuswalk-clipped')));
+  await page.evaluate(() => document.querySelectorAll('[data-accessready-clipped]').forEach((el) => el.removeAttribute('data-accessready-clipped')));
   await page.waitForTimeout(100);
   return issues;
 }

@@ -8,10 +8,10 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startSite } from './helpers.mjs';
 
-const BIN = fileURLToPath(new URL('../bin/focuswalk.mjs', import.meta.url));
+const BIN = fileURLToPath(new URL('../bin/accessready.mjs', import.meta.url));
 let site, dir;
 
-before(async () => { site = await startSite(); dir = mkdtempSync(join(tmpdir(), 'focuswalk-test-')); });
+before(async () => { site = await startSite(); dir = mkdtempSync(join(tmpdir(), 'accessready-test-')); });
 after(async () => { await site.close(); rmSync(dir, { recursive: true, force: true }); });
 
 function run(...args) {
@@ -79,7 +79,7 @@ test('--json - prints only JSON on stdout', async () => {
   const r = await run(`${site.origin}/rules.html`, '--json', '-');
   assert.equal(r.code, 1);
   const data = JSON.parse(r.stdout);
-  assert.equal(data.tool, 'focuswalk');
+  assert.equal(data.tool, 'accessready');
   assert.equal(data.totals.failures, 3);
   assert.equal(data.pages[0].issues[0].source, 'axe');
   assert.match(r.stderr, /3 WCAG 2\.2 AA failures/);

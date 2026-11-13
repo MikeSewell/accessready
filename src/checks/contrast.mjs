@@ -36,7 +36,7 @@ function describe(el) {
   };
 }
 
-const HIDE_TEXT = '[data-focuswalk-measure], [data-focuswalk-measure] * { color: transparent !important; -webkit-text-fill-color: transparent !important; text-shadow: none !important; caret-color: transparent !important; }';
+const HIDE_TEXT = '[data-accessready-measure], [data-accessready-measure] * { color: transparent !important; -webkit-text-fill-color: transparent !important; text-shadow: none !important; caret-color: transparent !important; }';
 
 export async function measureContrastOnImages(page, selectors) {
   const issues = [];
@@ -51,9 +51,9 @@ export async function measureContrastOnImages(page, selectors) {
     // (1.4.11, 3:1) and are often decoration, so they are left for a person.
     if (!info || info.painted || !/[\p{L}\p{N}]/u.test(info.text)) { unresolved.push({ selector }); continue; }
 
-    await el.evaluate((n) => n.setAttribute('data-focuswalk-measure', ''));
+    await el.evaluate((n) => n.setAttribute('data-accessready-measure', ''));
     const shot = await el.screenshot({ animations: 'disabled', timeout: 4000 }).catch(() => null);
-    await el.evaluate((n) => n.removeAttribute('data-focuswalk-measure')).catch(() => {});
+    await el.evaluate((n) => n.removeAttribute('data-accessready-measure')).catch(() => {});
     if (!shot) { unresolved.push({ selector, text: info.text }); continue; }
 
     const png = PNG.sync.read(shot);
@@ -73,7 +73,7 @@ export async function measureContrastOnImages(page, selectors) {
 
     if (best < info.needs) {
       issues.push({
-        id: 'contrast-on-image', source: 'focuswalk', kind: 'failure', wcag: ['1.4.3'], impact: 'serious',
+        id: 'contrast-on-image', source: 'accessready', kind: 'failure', wcag: ['1.4.3'], impact: 'serious',
         title: 'Text over an image is too faint everywhere',
         message: `"${info.text}" reaches ${best.toFixed(2)}:1 at best against what is behind it; it needs ${info.needs}:1`,
         selector, html: info.html,

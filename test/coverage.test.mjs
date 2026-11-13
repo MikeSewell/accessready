@@ -13,7 +13,7 @@ const source = ['../src/site.mjs', ...readdirSync(fileURLToPath(new URL('../src/
 // Every id a check can emit, with the source line that builds it.
 const lines = new Map();
 for (const line of source.split('\n')) {
-  if (!/\bid: .*source: 'focuswalk'/.test(line)) continue;
+  if (!/\bid: .*source: 'accessready'/.test(line)) continue;
   for (const m of line.slice(0, line.indexOf('source:')).matchAll(/'([a-z-]+)'/g)) if (m[1] !== 'failure') lines.set(m[1], line);
 }
 const emitted = new Set(lines.keys());

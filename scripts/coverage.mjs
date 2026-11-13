@@ -14,11 +14,11 @@ export function renderCoverageDoc() {
   const how = (r) => [
     r.tests,
     r.axeRules.length ? `axe-core: ${r.axeRules.map((id) => `\`${id}\``).join(', ')}.` : '',
-    r.own.length ? `focuswalk: ${r.own.map((id) => `\`${id}\``).join(', ')}.` : '',
+    r.own.length ? `accessready: ${r.own.map((id) => `\`${id}\``).join(', ')}.` : '',
   ].filter(Boolean).join(' ');
   return `# WCAG 2.2 coverage
 
-What focuswalk does about each of the ${counts.total} level A and AA success criteria in WCAG 2.2. Generated from \`src/coverage.mjs\` and axe-core ${axeVersion}; do not edit by hand.
+What accessready does about each of the ${counts.total} level A and AA success criteria in WCAG 2.2. Generated from \`src/coverage.mjs\` and axe-core ${axeVersion}; do not edit by hand.
 
 | | Criteria | What it means |
 |---|---|---|
