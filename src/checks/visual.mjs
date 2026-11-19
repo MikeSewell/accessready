@@ -513,7 +513,7 @@ async function checkPresentation(page, ctx) {
 // 1.4.5 and 1.4.9 Images of Text: pictures read with OCR (tesseract.js, English). The model
 // is downloaded once into the user's cache folder; a failed download leaves a note.
 
-let ocr = null; // { worker: Promise, timer }
+let ocr = null; // { worker: Promise, timer, users }
 const cacheDir = () => join(process.env.XDG_CACHE_HOME || join(homedir(), '.cache'), 'accessready', 'ocr');
 
 async function ocrData() {
@@ -531,11 +531,14 @@ async function ocrData() {
   return dir;
 }
 
-// One worker for the whole process. It is shut down after a few seconds without work, so a
-// finished audit does not keep Node running.
-async function ocrWorker() {
+// One worker for the whole process, shared by the pages audited at the same time. Each page
+// takes a lease and releases it when done; the worker is shut down a few seconds after the
+// last lease is released, so a finished audit does not keep Node running, and a page that is
+// still reading never has the worker shut down under it by a page that finished first.
+export async function ocrLease({ idle = OCR_IDLE } = {}) {
   if (!ocr) {
     ocr = {
+      users: 0,
       worker: (async () => {
         const cachePath = await ocrData();
         const { createWorker } = await import('tesseract.js');
@@ -545,19 +548,30 @@ async function ocrWorker() {
     // A failed download is not retried for every page of the audit.
     ocr.worker.catch(() => {});
   }
-  clearTimeout(ocr.timer);
-  return ocr.worker;
-}
-function ocrIdle() {
-  if (!ocr) return;
-  clearTimeout(ocr.timer);
   const current = ocr;
-  current.timer = setTimeout(() => {
-    if (ocr !== current) return;
-    ocr = null;
-    current.worker.then((w) => w.terminate()).catch(() => {});
-  }, OCR_IDLE);
-  current.timer.unref?.();
+  current.users++;
+  clearTimeout(current.timer);
+  let worker;
+  try {
+    worker = await current.worker;
+  } catch (e) {
+    current.users--;
+    throw e;
+  }
+  let released = false;
+  const release = () => {
+    if (released) return;
+    released = true;
+    current.users--;
+    if (current.users > 0 || ocr !== current) return;
+    current.timer = setTimeout(() => {
+      if (ocr !== current || current.users > 0) return;
+      ocr = null;
+      worker.terminate().catch(() => {});
+    }, idle);
+    current.timer.unref?.();
+  };
+  return { worker, release };
 }
 
 function imageCandidates({ min, max }) {
@@ -623,31 +637,34 @@ async function checkImagesOfText(page) {
   if (!picked.length) return [];
   const notes = [];
   const issues = [];
-  let worker;
+  let lease;
   try {
-    worker = await ocrWorker();
+    lease = await ocrLease();
   } catch (e) {
     await page.evaluate(() => document.querySelectorAll('[data-accessready-ocr]').forEach((el) => el.removeAttribute('data-accessready-ocr')));
     return { issues: [], notes: [`images were not read for text: ${String(e.message || e).split('\n')[0]}`] };
   }
-  // Only the picture itself is read: everything else is hidden while it is photographed, so
-  // text a page lays over an image (a caption, a menu, a banner) is not taken for part of it.
-  const removeStyles = await addStyles(page, `body *:not([data-accessready-ocr-now]), body *::before, body *::after { visibility: hidden !important; } [data-accessready-ocr-now] { visibility: visible !important; }`);
-  for (const p of picked) {
-    const el = page.locator(`[data-accessready-ocr="${p.index}"]`).first();
-    await el.evaluate((n) => n.setAttribute('data-accessready-ocr-now', '')).catch(() => {});
-    const shot = await el.screenshot({ animations: 'disabled', timeout: 4000 }).catch(() => null);
-    await el.evaluate((n) => n.removeAttribute('data-accessready-ocr-now')).catch(() => {});
-    if (!shot) continue;
-    const result = await worker.recognize(shrink(shot), {}, { blocks: true }).catch(() => null);
-    if (!result) continue;
-    const words = wordsIn(result.data);
-    const letters = words.join('').length;
-    if (words.length < 3 || letters < 10) continue;
-    issues.push(issue('image-of-text', { selector: p.selector, html: p.html, message: `the image shows text ("${words.slice(0, 8).join(' ')}${words.length > 8 ? ' ...' : ''}"); unless it is a logo or the look of the text is essential, use real text styled with CSS` }));
+  try {
+    // Only the picture itself is read: everything else is hidden while it is photographed, so
+    // text a page lays over an image (a caption, a menu, a banner) is not taken for part of it.
+    const removeStyles = await addStyles(page, `body *:not([data-accessready-ocr-now]), body *::before, body *::after { visibility: hidden !important; } [data-accessready-ocr-now] { visibility: visible !important; }`);
+    for (const p of picked) {
+      const el = page.locator(`[data-accessready-ocr="${p.index}"]`).first();
+      await el.evaluate((n) => n.setAttribute('data-accessready-ocr-now', '')).catch(() => {});
+      const shot = await el.screenshot({ animations: 'disabled', timeout: 4000 }).catch(() => null);
+      await el.evaluate((n) => n.removeAttribute('data-accessready-ocr-now')).catch(() => {});
+      if (!shot) continue;
+      const result = await lease.worker.recognize(shrink(shot), {}, { blocks: true }).catch(() => null);
+      if (!result) continue;
+      const words = wordsIn(result.data);
+      const letters = words.join('').length;
+      if (words.length < 3 || letters < 10) continue;
+      issues.push(issue('image-of-text', { selector: p.selector, html: p.html, message: `the image shows text ("${words.slice(0, 8).join(' ')}${words.length > 8 ? ' ...' : ''}"); unless it is a logo or the look of the text is essential, use real text styled with CSS` }));
+    }
+    await removeStyles();
+  } finally {
+    lease.release();
   }
-  await removeStyles();
-  ocrIdle();
   await page.evaluate(() => {
     document.querySelectorAll('[data-accessready-ocr]').forEach((el) => el.removeAttribute('data-accessready-ocr'));
     window.scrollTo(0, 0);

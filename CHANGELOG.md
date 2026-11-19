@@ -2,6 +2,10 @@
 
 All notable changes to this project are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## 0.2.1 - 2026-11-19
+
+- Fixed: an audit could crash part way through with "Cannot read properties of null (reading 'postMessage')", most often on a slow site. Pages audited at the same time share one OCR worker for images of text, and a page that finished first shut that worker down while another page was still reading pictures with it. The worker now closes only a few seconds after the last page is done with it.
+
 ## 0.2.0 - 2026-11-13
 
 Every WCAG 2.2 criterion, A to AAA, now has an automated check or is listed for a person, and every A and AA criterion has at least one automated check. Needs Node 22 or newer.
